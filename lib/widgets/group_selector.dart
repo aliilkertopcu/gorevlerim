@@ -40,7 +40,7 @@ class GroupSelector extends ConsumerWidget {
               ownerId: item.id,
               ownerType: item.type,
             );
-            ref.invalidate(tasksProvider);
+            ref.invalidate(tasksStreamProvider);
           },
           itemBuilder: (context) => items.map((item) {
             return PopupMenuItem<String>(

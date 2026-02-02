@@ -41,6 +41,11 @@ class HomeScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Yenile',
+            onPressed: () => ref.invalidate(tasksStreamProvider),
+          ),
+          IconButton(
             icon: const Icon(Icons.group_add),
             tooltip: 'Grup Yönetimi',
             onPressed: () {
@@ -104,32 +109,47 @@ class HomeScreen extends ConsumerWidget {
                     );
                   }
 
-                  return ReorderableListView.builder(
-                    buildDefaultDragHandles: false,
-                    itemCount: tasks.length,
-                    onReorder: (oldIndex, newIndex) async {
-                      if (newIndex > oldIndex) newIndex--;
-                      final taskIds = tasks.map((t) => t.id).toList();
-                      final movedId = taskIds.removeAt(oldIndex);
-                      taskIds.insert(newIndex, movedId);
-                      await ref.read(taskServiceProvider).reorderTasks(taskIds);
-                      ref.invalidate(tasksProvider);
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(tasksStreamProvider);
+                      // Wait a bit for the stream to emit new data
+                      await Future.delayed(const Duration(milliseconds: 500));
                     },
-                    proxyDecorator: (child, index, animation) {
-                      return Material(
-                        elevation: 4,
-                        borderRadius: BorderRadius.circular(8),
-                        child: child,
-                      );
-                    },
-                    itemBuilder: (context, index) {
-                      final task = tasks[index];
-                      return TaskCard(
-                        key: ValueKey(task.id),
-                        task: task,
-                        index: index,
-                      );
-                    },
+                    child: ReorderableListView.builder(
+                      buildDefaultDragHandles: false,
+                      itemCount: tasks.length,
+                      onReorder: (oldIndex, newIndex) {
+                        if (newIndex > oldIndex) newIndex--;
+                        // Optimistic reorder
+                        ref.read(tasksNotifierProvider.notifier).optimisticReorderTasks(oldIndex, newIndex);
+                        // Sync with server - only update moved task
+                        final movedId = tasks[oldIndex].id;
+                        final taskIds = tasks.map((t) => t.id).toList();
+                        taskIds.removeAt(oldIndex);
+                        taskIds.insert(newIndex, movedId);
+                        ref.read(taskServiceProvider).reorderTasks(
+                          taskIds,
+                          movedTaskId: movedId,
+                          oldIndex: oldIndex,
+                          newIndex: newIndex,
+                        );
+                      },
+                      proxyDecorator: (child, index, animation) {
+                        return Material(
+                          elevation: 4,
+                          borderRadius: BorderRadius.circular(8),
+                          child: child,
+                        );
+                      },
+                      itemBuilder: (context, index) {
+                        final task = tasks[index];
+                        return TaskCard(
+                          key: ValueKey(task.id),
+                          task: task,
+                          index: index,
+                        );
+                      },
+                    ),
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -142,7 +162,7 @@ class HomeScreen extends ConsumerWidget {
                       Text('Hata: $error'),
                       const SizedBox(height: 12),
                       ElevatedButton(
-                        onPressed: () => ref.invalidate(tasksProvider),
+                        onPressed: () => ref.invalidate(tasksStreamProvider),
                         child: const Text('Tekrar Dene'),
                       ),
                     ],

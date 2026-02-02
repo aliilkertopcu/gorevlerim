@@ -68,8 +68,8 @@ class _TaskFormState extends ConsumerState<TaskForm> {
       _descController.clear();
       setState(() => _isExpanded = false);
 
-      // Refresh tasks
-      ref.invalidate(tasksProvider);
+      // Refresh tasks (stream will auto-sync, but invalidate to be sure)
+      ref.invalidate(tasksStreamProvider);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

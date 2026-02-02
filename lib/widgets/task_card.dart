@@ -145,7 +145,10 @@ class TaskCard extends ConsumerWidget {
                   icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
                   itemBuilder: (context) => [
                     const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                    const PopupMenuItem(value: 'block', child: Text('Bloke Et')),
+                    PopupMenuItem(
+                      value: task.isBlocked ? 'unblock' : 'block',
+                      child: Text(task.isBlocked ? 'Blokeyi Kaldır' : 'Bloke Et'),
+                    ),
                     const PopupMenuItem(value: 'postpone', child: Text('Ertele')),
                     const PopupMenuDivider(),
                     const PopupMenuItem(
@@ -198,13 +201,21 @@ class TaskCard extends ConsumerWidget {
                     child: child,
                   );
                 },
-                onReorder: (oldIndex, newIndex) async {
+                onReorder: (oldIndex, newIndex) {
                   if (newIndex > oldIndex) newIndex--;
+                  // Optimistic reorder
+                  ref.read(tasksNotifierProvider.notifier).optimisticReorderSubtasks(task.id, oldIndex, newIndex);
+                  // Sync with server - only update moved subtask
+                  final movedId = task.subtasks[oldIndex].id;
                   final ids = task.subtasks.map((s) => s.id).toList();
-                  final movedId = ids.removeAt(oldIndex);
+                  ids.removeAt(oldIndex);
                   ids.insert(newIndex, movedId);
-                  await ref.read(taskServiceProvider).reorderSubtasks(ids);
-                  ref.invalidate(tasksProvider);
+                  ref.read(taskServiceProvider).reorderSubtasks(
+                    ids,
+                    movedSubtaskId: movedId,
+                    oldIndex: oldIndex,
+                    newIndex: newIndex,
+                  );
                 },
                 children: task.subtasks.asMap().entries.map((entry) {
                   final idx = entry.key;
@@ -228,9 +239,11 @@ class TaskCard extends ConsumerWidget {
     );
   }
 
-  void _toggleComplete(WidgetRef ref) async {
-    await ref.read(taskServiceProvider).toggleComplete(task.id, task.isCompleted);
-    ref.invalidate(tasksProvider);
+  void _toggleComplete(WidgetRef ref) {
+    // Optimistic update - instant UI change
+    ref.read(tasksNotifierProvider.notifier).optimisticToggleComplete(task.id);
+    // Then sync with server (no await needed)
+    ref.read(taskServiceProvider).toggleComplete(task.id, task.isCompleted);
   }
 
   void _onMenuAction(BuildContext context, WidgetRef ref, String action) {
@@ -239,6 +252,8 @@ class TaskCard extends ConsumerWidget {
         _showEditDialog(context, ref);
       case 'block':
         _showBlockDialog(context, ref);
+      case 'unblock':
+        _unblockTask(ref);
       case 'postpone':
         _showPostponeDialog(context, ref);
       case 'delete':
@@ -250,7 +265,7 @@ class TaskCard extends ConsumerWidget {
     final titleController = TextEditingController(text: task.title);
     final descController = TextEditingController(text: task.description ?? '');
 
-    Future<void> saveEdit(BuildContext dialogContext) async {
+    void saveEdit(BuildContext dialogContext) {
       final descText = descController.text.trim();
       final lines = descText.split('\n');
       final subtaskTitles = <String>[];
@@ -265,23 +280,32 @@ class TaskCard extends ConsumerWidget {
       }
 
       final cleanDesc = descLines.join('\n').trim();
+      final newTitle = titleController.text.trim();
 
-      await ref.read(taskServiceProvider).updateTask(task.id, {
-        'title': titleController.text.trim(),
+      Navigator.pop(dialogContext);
+
+      // Optimistic update
+      ref.read(tasksNotifierProvider.notifier).optimisticUpdateTask(
+        task.id,
+        title: newTitle,
+        description: cleanDesc.isEmpty ? null : cleanDesc,
+      );
+
+      // Sync with server
+      ref.read(taskServiceProvider).updateTask(task.id, {
+        'title': newTitle,
         'description': cleanDesc.isEmpty ? null : cleanDesc,
       });
 
+      // Create subtasks (these will be synced via stream)
       for (final st in subtaskTitles) {
         if (st.isNotEmpty) {
-          await ref.read(taskServiceProvider).createSubtask(
+          ref.read(taskServiceProvider).createSubtask(
             taskId: task.id,
             title: st,
           );
         }
       }
-
-      ref.invalidate(tasksProvider);
-      if (dialogContext.mounted) Navigator.pop(dialogContext);
     }
 
     showDialog(
@@ -333,32 +357,44 @@ class TaskCard extends ConsumerWidget {
   void _showBlockDialog(BuildContext context, WidgetRef ref) {
     final reasonController = TextEditingController();
 
+    void doBlock(BuildContext dialogContext) {
+      final reason = reasonController.text.trim();
+      Navigator.pop(dialogContext);
+      // Optimistic block
+      ref.read(tasksNotifierProvider.notifier).optimisticBlockTask(task.id, reason.isEmpty ? null : reason);
+      ref.read(taskServiceProvider).blockTask(task.id, reason);
+    }
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Görevi Bloke Et'),
-        content: TextField(
-          controller: reasonController,
-          decoration: const InputDecoration(
-            labelText: 'Bloke sebebi',
-            hintText: 'Neden bloke edildi?',
+        content: KeyboardListener(
+          focusNode: FocusNode(),
+          onKeyEvent: (event) {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.enter &&
+                HardwareKeyboard.instance.isControlPressed) {
+              doBlock(dialogContext);
+            }
+          },
+          child: TextField(
+            controller: reasonController,
+            decoration: const InputDecoration(
+              labelText: 'Bloke sebebi',
+              hintText: 'Neden bloke edildi?\nCtrl+Enter ile kaydet',
+            ),
+            maxLines: 2,
+            autofocus: true,
           ),
-          maxLines: 2,
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('İptal'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              await ref.read(taskServiceProvider).blockTask(
-                task.id,
-                reasonController.text.trim(),
-              );
-              ref.invalidate(tasksProvider);
-              if (context.mounted) Navigator.pop(context);
-            },
+            onPressed: () => doBlock(dialogContext),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.blockedColor),
             child: const Text('Bloke Et'),
           ),
@@ -381,10 +417,11 @@ class TaskCard extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.today),
               title: const Text('Yarına ertele'),
-              onTap: () async {
-                await ref.read(taskServiceProvider).postponeTask(task.id, tomorrow);
-                ref.invalidate(tasksProvider);
-                if (context.mounted) Navigator.pop(context);
+              onTap: () {
+                Navigator.pop(context);
+                // Optimistic - remove from current day's list
+                ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
+                ref.read(taskServiceProvider).postponeTask(task.id, tomorrow);
               },
             ),
             ListTile(
@@ -400,8 +437,9 @@ class TaskCard extends ConsumerWidget {
                   locale: const Locale('tr', 'TR'),
                 );
                 if (picked != null) {
-                  await ref.read(taskServiceProvider).postponeTask(task.id, picked);
-                  ref.invalidate(tasksProvider);
+                  // Optimistic - remove from current day's list
+                  ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
+                  ref.read(taskServiceProvider).postponeTask(task.id, picked);
                 }
               },
             ),
@@ -411,25 +449,34 @@ class TaskCard extends ConsumerWidget {
     );
   }
 
-  void _deleteTask(WidgetRef ref) async {
-    await ref.read(taskServiceProvider).deleteTask(task.id);
-    ref.invalidate(tasksProvider);
+  void _deleteTask(WidgetRef ref) {
+    // Optimistic delete
+    ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
+    ref.read(taskServiceProvider).deleteTask(task.id);
+  }
+
+  void _unblockTask(WidgetRef ref) {
+    // Optimistic unblock
+    ref.read(tasksNotifierProvider.notifier).optimisticUnblockTask(task.id);
+    ref.read(taskServiceProvider).updateTask(task.id, {
+      'status': 'pending',
+      'block_reason': null,
+    });
   }
 
   // Subtask actions
-  void _toggleSubtask(WidgetRef ref, Subtask subtask) async {
-    await ref.read(taskServiceProvider).toggleSubtaskComplete(
-      subtask.id,
-      subtask.isCompleted,
-    );
-    // Check auto-complete
-    await ref.read(taskServiceProvider).checkAutoComplete(task.id);
-    ref.invalidate(tasksProvider);
+  void _toggleSubtask(WidgetRef ref, Subtask subtask) {
+    // Optimistic toggle
+    ref.read(tasksNotifierProvider.notifier).optimisticToggleSubtask(task.id, subtask.id);
+    // Sync with server
+    ref.read(taskServiceProvider).toggleSubtaskComplete(subtask.id, subtask.isCompleted);
+    ref.read(taskServiceProvider).checkAutoComplete(task.id);
   }
 
-  void _deleteSubtask(WidgetRef ref, Subtask subtask) async {
-    await ref.read(taskServiceProvider).deleteSubtask(subtask.id);
-    ref.invalidate(tasksProvider);
+  void _deleteSubtask(WidgetRef ref, Subtask subtask) {
+    // Optimistic delete
+    ref.read(tasksNotifierProvider.notifier).optimisticDeleteSubtask(task.id, subtask.id);
+    ref.read(taskServiceProvider).deleteSubtask(subtask.id);
   }
 
   void _blockSubtask(BuildContext context, WidgetRef ref, Subtask subtask) {
@@ -449,13 +496,12 @@ class TaskCard extends ConsumerWidget {
             child: const Text('İptal'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              await ref.read(taskServiceProvider).blockSubtask(
-                subtask.id,
-                reasonController.text.trim(),
-              );
-              ref.invalidate(tasksProvider);
-              if (context.mounted) Navigator.pop(context);
+            onPressed: () {
+              final reason = reasonController.text.trim();
+              Navigator.pop(context);
+              // Optimistic block
+              ref.read(tasksNotifierProvider.notifier).optimisticBlockSubtask(task.id, subtask.id, reason.isEmpty ? null : reason);
+              ref.read(taskServiceProvider).blockSubtask(subtask.id, reason);
             },
             child: const Text('Bloke Et'),
           ),
@@ -481,13 +527,12 @@ class TaskCard extends ConsumerWidget {
             child: const Text('İptal'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              await ref.read(taskServiceProvider).updateSubtask(
-                subtask.id,
-                {'title': titleController.text.trim()},
-              );
-              ref.invalidate(tasksProvider);
-              if (context.mounted) Navigator.pop(context);
+            onPressed: () {
+              final newTitle = titleController.text.trim();
+              Navigator.pop(context);
+              // Optimistic update
+              ref.read(tasksNotifierProvider.notifier).optimisticUpdateSubtask(task.id, subtask.id, newTitle);
+              ref.read(taskServiceProvider).updateSubtask(subtask.id, {'title': newTitle});
             },
             child: const Text('Kaydet'),
           ),
@@ -496,14 +541,17 @@ class TaskCard extends ConsumerWidget {
     );
   }
 
-  void _promoteSubtask(WidgetRef ref, Subtask subtask) async {
+  void _promoteSubtask(WidgetRef ref, Subtask subtask) {
     final owner = ref.read(ownerContextProvider);
     final user = ref.read(currentUserProvider);
     final date = ref.read(selectedDateProvider);
 
     if (owner == null || user == null) return;
 
-    await ref.read(taskServiceProvider).promoteSubtask(
+    // Optimistic - remove subtask from parent (new task will appear via stream)
+    ref.read(tasksNotifierProvider.notifier).optimisticDeleteSubtask(task.id, subtask.id);
+
+    ref.read(taskServiceProvider).promoteSubtask(
       subtaskId: subtask.id,
       taskId: task.id,
       ownerId: owner.ownerId,
@@ -511,6 +559,5 @@ class TaskCard extends ConsumerWidget {
       date: date,
       createdBy: user.id,
     );
-    ref.invalidate(tasksProvider);
   }
 }
