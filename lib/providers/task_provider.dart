@@ -28,16 +28,232 @@ final ownerContextProvider = StateProvider<OwnerContext?>((ref) {
   return OwnerContext(ownerId: user.id, ownerType: 'user');
 });
 
-final tasksProvider = FutureProvider.autoDispose<List<Task>>((ref) async {
+/// Optimistic state for tasks - allows instant UI updates
+class TasksNotifier extends StateNotifier<List<Task>> {
+  TasksNotifier() : super([]);
+
+  DateTime? _lastOptimisticUpdate;
+  static const _debounceMs = 800; // Ignore stream updates for 800ms after optimistic change
+
+  void setTasks(List<Task> tasks) {
+    // If we recently did an optimistic update, ignore stream data briefly
+    if (_lastOptimisticUpdate != null) {
+      final elapsed = DateTime.now().difference(_lastOptimisticUpdate!).inMilliseconds;
+      if (elapsed < _debounceMs) {
+        return; // Skip this stream update
+      }
+      _lastOptimisticUpdate = null;
+    }
+    state = tasks;
+  }
+
+  void _markOptimisticUpdate() {
+    _lastOptimisticUpdate = DateTime.now();
+  }
+
+  /// Optimistic toggle complete - also updates non-deleted subtasks
+  void optimisticToggleComplete(String taskId) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        final newStatus = task.isCompleted ? 'pending' : 'completed';
+        // Update all non-deleted subtasks to match parent status
+        final updatedSubtasks = task.subtasks.map((s) {
+          if (s.status != 'deleted') {
+            return s.copyWith(status: newStatus);
+          }
+          return s;
+        }).toList();
+        return task.copyWith(
+          status: newStatus,
+          subtasks: updatedSubtasks,
+        );
+      }
+      return task;
+    }).toList();
+  }
+
+  /// Optimistic toggle subtask complete
+  void optimisticToggleSubtask(String taskId, String subtaskId) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        final updatedSubtasks = task.subtasks.map((s) {
+          if (s.id == subtaskId) {
+            return s.copyWith(
+              status: s.isCompleted ? 'pending' : 'completed',
+            );
+          }
+          return s;
+        }).toList();
+        return task.copyWith(subtasks: updatedSubtasks);
+      }
+      return task;
+    }).toList();
+  }
+
+  /// Optimistic delete task
+  void optimisticDeleteTask(String taskId) {
+    _markOptimisticUpdate();
+    state = state.where((task) => task.id != taskId).toList();
+  }
+
+  /// Optimistic delete subtask
+  void optimisticDeleteSubtask(String taskId, String subtaskId) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        final updatedSubtasks = task.subtasks.where((s) => s.id != subtaskId).toList();
+        return task.copyWith(subtasks: updatedSubtasks);
+      }
+      return task;
+    }).toList();
+  }
+
+  /// Optimistic block task
+  void optimisticBlockTask(String taskId, String? reason) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        return task.copyWith(status: 'blocked', blockReason: reason);
+      }
+      return task;
+    }).toList();
+  }
+
+  /// Optimistic unblock task
+  void optimisticUnblockTask(String taskId) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        return task.copyWith(status: 'pending', blockReason: null);
+      }
+      return task;
+    }).toList();
+  }
+
+  /// Optimistic block subtask
+  void optimisticBlockSubtask(String taskId, String subtaskId, String? reason) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        final updatedSubtasks = task.subtasks.map((s) {
+          if (s.id == subtaskId) {
+            return s.copyWith(status: 'blocked', blockReason: reason);
+          }
+          return s;
+        }).toList();
+        return task.copyWith(subtasks: updatedSubtasks);
+      }
+      return task;
+    }).toList();
+  }
+
+  /// Optimistic update task
+  void optimisticUpdateTask(String taskId, {String? title, String? description}) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        return task.copyWith(
+          title: title ?? task.title,
+          description: description,
+        );
+      }
+      return task;
+    }).toList();
+  }
+
+  /// Optimistic update subtask
+  void optimisticUpdateSubtask(String taskId, String subtaskId, String title) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        final updatedSubtasks = task.subtasks.map((s) {
+          if (s.id == subtaskId) {
+            return s.copyWith(title: title);
+          }
+          return s;
+        }).toList();
+        return task.copyWith(subtasks: updatedSubtasks);
+      }
+      return task;
+    }).toList();
+  }
+
+  /// Optimistic reorder tasks
+  void optimisticReorderTasks(int oldIndex, int newIndex) {
+    _markOptimisticUpdate();
+    final tasks = [...state];
+    final task = tasks.removeAt(oldIndex);
+    tasks.insert(newIndex, task);
+    state = tasks;
+  }
+
+  /// Optimistic reorder subtasks
+  void optimisticReorderSubtasks(String taskId, int oldIndex, int newIndex) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        final subtasks = [...task.subtasks];
+        final subtask = subtasks.removeAt(oldIndex);
+        subtasks.insert(newIndex, subtask);
+        return task.copyWith(subtasks: subtasks);
+      }
+      return task;
+    }).toList();
+  }
+}
+
+final tasksNotifierProvider = StateNotifierProvider<TasksNotifier, List<Task>>((ref) {
+  return TasksNotifier();
+});
+
+/// Stream that syncs server data to local state
+final tasksStreamProvider = StreamProvider.autoDispose<List<Task>>((ref) {
   final taskService = ref.watch(taskServiceProvider);
   final owner = ref.watch(ownerContextProvider);
   final date = ref.watch(selectedDateProvider);
+  final notifier = ref.watch(tasksNotifierProvider.notifier);
 
-  if (owner == null) return [];
+  if (owner == null) {
+    return Stream.value([]);
+  }
 
-  return taskService.fetchTasks(
-    ownerId: owner.ownerId,
-    ownerType: owner.ownerType,
-    date: date,
-  );
+  return taskService
+      .streamTasksWithSubtasks(
+        ownerId: owner.ownerId,
+        ownerType: owner.ownerType,
+        date: date,
+      )
+      .map((tasks) {
+    // Sync server data to local state
+    notifier.setTasks(tasks);
+    return tasks;
+  });
+});
+
+/// Main provider to use in UI - uses local state with stream sync
+final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
+  // Subscribe to stream to trigger updates
+  final streamAsync = ref.watch(tasksStreamProvider);
+  // Get optimistic local state
+  final localTasks = ref.watch(tasksNotifierProvider);
+
+  // If stream has error, return error
+  if (streamAsync.hasError) {
+    return AsyncValue.error(streamAsync.error!, streamAsync.stackTrace ?? StackTrace.current);
+  }
+
+  // If we have local data, use it (optimistic)
+  if (localTasks.isNotEmpty) {
+    return AsyncValue.data(localTasks);
+  }
+
+  // If stream is loading and no local data, show loading
+  if (streamAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+
+  // Stream has data, use it
+  return AsyncValue.data(streamAsync.value ?? []);
 });
