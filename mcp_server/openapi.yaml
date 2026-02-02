@@ -1,0 +1,288 @@
+openapi: 3.1.0
+info:
+  title: Görevlerim API
+  description: |
+    Kişisel görev yönetimi için API. Günlük görevleri listeleme, ekleme, tamamlama ve erteleme işlemleri.
+
+    Tarih formatları:
+    - "today" veya "bugün" → bugünün tarihi
+    - "tomorrow" veya "yarın" → yarının tarihi
+    - "yesterday" veya "dün" → dünün tarihi
+    - "YYYY-MM-DD" → belirli tarih
+  version: 2.0.0
+
+servers:
+  - url: https://njzmorqwcsdnjjtvvmgd.supabase.co/functions/v1/todo-api
+    description: Supabase Edge Function
+
+paths:
+  /tasks:
+    get:
+      operationId: listTasks
+      summary: Görevleri listele
+      description: Belirli bir tarihteki tüm görevleri alt görevleriyle birlikte getirir
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            default: today
+          description: "Tarih (today, tomorrow, yesterday veya YYYY-MM-DD)"
+      responses:
+        "200":
+          description: Görev listesi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  total:
+                    type: integer
+                  completed:
+                    type: integer
+                  tasks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TaskSummary"
+
+    post:
+      operationId: createTasks
+      summary: Yeni görev(ler) ekle
+      description: |
+        Bir veya birden fazla görev ekler.
+        - Tek görev: title alanını kullan
+        - Çoklu görev: virgülle ayır ("market, fatura, spor") veya titles array kullan
+        - Alt görevler: description içinde "* " ile başlayan satırlar veya subtasks array
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: "Görev başlığı. Virgülle ayrılmış birden fazla görev yazılabilir."
+                titles:
+                  type: array
+                  items:
+                    type: string
+                  description: "Alternatif: Görev başlıkları array olarak"
+                description:
+                  type: string
+                  description: "Açıklama. '* ' ile başlayan satırlar alt görev olur."
+                subtasks:
+                  type: array
+                  items:
+                    type: string
+                  description: "Alt görevler (tek görev eklerken)"
+                date:
+                  type: string
+                  default: today
+                  description: "Tarih (today, tomorrow, yesterday veya YYYY-MM-DD)"
+              required:
+                - title
+            examples:
+              single:
+                summary: Tek görev
+                value:
+                  title: "Market alışverişi"
+                  date: "today"
+              multiple:
+                summary: Virgülle çoklu görev
+                value:
+                  title: "Market, fatura öde, spor"
+                  date: "today"
+              with_subtasks:
+                summary: Alt görevli
+                value:
+                  title: "Proje toplantısı"
+                  subtasks: ["Sunum hazırla", "Notları gözden geçir"]
+                  date: "tomorrow"
+      responses:
+        "201":
+          description: Görev(ler) oluşturuldu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  date:
+                    type: string
+                  created:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+
+  /tasks/complete:
+    post:
+      operationId: completeTask
+      summary: Görevi tamamla (numara ile)
+      description: Listede görünen sıra numarasına göre görevi tamamlar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                task_number:
+                  type: integer
+                  description: "Görevin liste sırası (1'den başlar)"
+                date:
+                  type: string
+                  default: today
+              required:
+                - task_number
+            example:
+              task_number: 3
+              date: "today"
+      responses:
+        "200":
+          description: Görev tamamlandı
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  task:
+                    $ref: "#/components/schemas/TaskSummary"
+
+  /tasks/postpone:
+    post:
+      operationId: postponeTask
+      summary: Görevi ertele (numara ile)
+      description: Görevi başka bir tarihe erteler
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                task_number:
+                  type: integer
+                  description: "Görevin liste sırası"
+                date:
+                  type: string
+                  default: today
+                  description: "Görevin şu anki tarihi"
+                target_date:
+                  type: string
+                  default: tomorrow
+                  description: "Ertelenecek tarih"
+              required:
+                - task_number
+            example:
+              task_number: 2
+              date: "today"
+              target_date: "tomorrow"
+      responses:
+        "200":
+          description: Görev ertelendi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /tasks/{task_id}:
+    patch:
+      operationId: updateTask
+      summary: Görevi güncelle (ID ile)
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: [pending, completed, blocked]
+                block_reason:
+                  type: string
+                date:
+                  type: string
+      responses:
+        "200":
+          description: Görev güncellendi
+
+    delete:
+      operationId: deleteTask
+      summary: Görevi sil (ID ile)
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Görev silindi
+
+components:
+  schemas:
+    TaskSummary:
+      type: object
+      properties:
+        number:
+          type: integer
+          description: "Liste sırası (1'den başlar)"
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, completed, blocked]
+        block_reason:
+          type: string
+        subtasks:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              title:
+                type: string
+              status:
+                type: string
+
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      name: x-api-key
+      in: header
+
+security:
+  - apiKey: []
