@@ -33,8 +33,10 @@ class AuthService {
   Future<void> signInWithGoogle() async {
     if (kIsWeb) {
       // Web: Use Supabase OAuth flow (redirects to Google)
-      // Uri.base gives current URL (works with any port)
-      final redirectUrl = Uri.base.origin;
+      // Include full path for GitHub Pages subpath deployment
+      final currentPath = Uri.base.path;
+      final basePath = currentPath.endsWith('/') ? currentPath : '$currentPath/';
+      final redirectUrl = '${Uri.base.origin}$basePath';
       await _client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectUrl,
