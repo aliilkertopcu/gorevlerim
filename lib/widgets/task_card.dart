@@ -15,8 +15,9 @@ class TaskCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final statusColor = AppTheme.statusColor(task.status);
-    final bgColor = AppTheme.statusBackground(task.status);
+    final bgColor = AppTheme.statusBackground(task.status, isDark: isDark);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),

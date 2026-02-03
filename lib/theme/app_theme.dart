@@ -10,6 +10,11 @@ class AppTheme {
   static const Color background = Color(0xFFf0f2f5);
   static const Color cardBackground = Color(0xFFf8f9fa);
 
+  // Dark theme colors
+  static const Color darkBackground = Color(0xFF121212);
+  static const Color darkCardBackground = Color(0xFF1e1e1e);
+  static const Color darkSurface = Color(0xFF2d2d2d);
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -20,7 +25,7 @@ class AppTheme {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
-        centerTitle: true,
+        centerTitle: false,
       ),
       cardTheme: CardThemeData(
         color: cardBackground,
@@ -57,6 +62,61 @@ class AppTheme {
     );
   }
 
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      colorSchemeSeed: primaryColor,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: darkBackground,
+      appBarTheme: AppBarTheme(
+        backgroundColor: darkSurface,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+      ),
+      cardTheme: CardThemeData(
+        color: darkCardBackground,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[700]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: primaryColor, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        fillColor: darkCardBackground,
+        filled: true,
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: darkSurface,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: darkSurface,
+      ),
+    );
+  }
+
   static Color statusColor(String status) {
     switch (status) {
       case 'completed':
@@ -70,7 +130,19 @@ class AppTheme {
     }
   }
 
-  static Color statusBackground(String status) {
+  static Color statusBackground(String status, {bool isDark = false}) {
+    if (isDark) {
+      switch (status) {
+        case 'completed':
+          return const Color(0xFF1a3d1a);
+        case 'blocked':
+          return const Color(0xFF3d1a1a);
+        case 'postponed':
+          return const Color(0xFF3d3a1a);
+        default:
+          return darkCardBackground;
+      }
+    }
     switch (status) {
       case 'completed':
         return const Color(0xFFd4edda);
