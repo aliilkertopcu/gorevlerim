@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze:*)",
+      "Bash(where:*)",
+      "Bash(/c/Users/hp/development/flutter/bin/flutter.bat analyze:*)",
+      "Bash(echo:*)",
+      "Bash(~/.bashrc)",
+      "Bash(export PATH=\"$PATH:/c/Users/hp/development/flutter/bin\")",
+      "Bash(flutter:*)"
+    ]
+  }
+}

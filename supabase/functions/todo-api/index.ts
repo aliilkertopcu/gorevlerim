@@ -6,10 +6,6 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-// Simple API key auth for ChatGPT
-const API_KEY = Deno.env.get("TODO_API_KEY") || "changeme";
-const DEFAULT_USER_ID = Deno.env.get("TODO_USER_ID")!;
-
 function formatDate(dateStr?: string): string {
   if (!dateStr || dateStr === "today" || dateStr === "bugün") {
     const d = new Date();
@@ -28,9 +24,27 @@ function formatDate(dateStr?: string): string {
   return dateStr;
 }
 
-function auth(req: Request): boolean {
-  const key = req.headers.get("x-api-key") || new URL(req.url).searchParams.get("api_key");
-  return key === API_KEY;
+// Authenticate request using api_keys table
+async function authenticateRequest(req: Request): Promise<string | null> {
+  const apiKey = req.headers.get("x-api-key") || new URL(req.url).searchParams.get("api_key");
+  if (!apiKey) return null;
+
+  const { data, error } = await supabase
+    .from("api_keys")
+    .select("user_id")
+    .eq("key", apiKey)
+    .single();
+
+  if (error || !data) return null;
+
+  // Update last_used_at (fire and forget)
+  supabase
+    .from("api_keys")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("key", apiKey)
+    .then(() => {});
+
+  return data.user_id;
 }
 
 Deno.serve(async (req) => {
@@ -39,11 +53,12 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Auth check
-  if (!auth(req)) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+  // Auth check - get user_id from API key
+  const userId = await authenticateRequest(req);
+  if (!userId) {
+    return new Response(JSON.stringify({ error: "Unauthorized - Invalid API key" }), {
       status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
     });
   }
 
@@ -55,7 +70,7 @@ Deno.serve(async (req) => {
     // GET /tasks — list tasks for a date
     if (method === "GET" && (path === "tasks" || path === "")) {
       const date = formatDate(url.searchParams.get("date") || "today");
-      const ownerId = url.searchParams.get("owner_id") || DEFAULT_USER_ID;
+      const ownerId = url.searchParams.get("owner_id") || userId;
       const ownerType = url.searchParams.get("owner_type") || "user";
 
       const { data: tasks, error } = await supabase
@@ -94,7 +109,7 @@ Deno.serve(async (req) => {
           })),
         })),
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
       });
     }
 
@@ -102,9 +117,9 @@ Deno.serve(async (req) => {
     if (method === "POST" && (path === "tasks" || path === "")) {
       const body = await req.json();
       const date = formatDate(body.date || "today");
-      const ownerId = body.owner_id || DEFAULT_USER_ID;
+      const ownerId = body.owner_id || userId;
       const ownerType = body.owner_type || "user";
-      const createdBy = body.created_by || DEFAULT_USER_ID;
+      const createdBy = userId;
 
       // Support comma-separated titles or array
       let titles: string[];
@@ -190,7 +205,7 @@ Deno.serve(async (req) => {
         created,
       }), {
         status: 201,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
       });
     }
 
@@ -231,7 +246,7 @@ Deno.serve(async (req) => {
         message: `"${data.title}" güncellendi`,
         task: { id: data.id, title: data.title, status: data.status },
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
       });
     }
 
@@ -239,7 +254,7 @@ Deno.serve(async (req) => {
     if (method === "POST" && path === "tasks/complete") {
       const body = await req.json();
       const date = formatDate(body.date || "today");
-      const ownerId = body.owner_id || DEFAULT_USER_ID;
+      const ownerId = body.owner_id || userId;
       const ownerType = body.owner_type || "user";
       const taskNumber = body.task_number;
 
@@ -276,7 +291,7 @@ Deno.serve(async (req) => {
         message: `"${target.title}" tamamlandı!`,
         task: { id: target.id, title: target.title, status: "completed" },
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
       });
     }
 
@@ -296,7 +311,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         message: `"${data.title}" silindi`,
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
       });
     }
 
@@ -305,7 +320,7 @@ Deno.serve(async (req) => {
       const body = await req.json();
       const date = formatDate(body.date || "today");
       const targetDate = formatDate(body.target_date || "tomorrow");
-      const ownerId = body.owner_id || DEFAULT_USER_ID;
+      const ownerId = body.owner_id || userId;
       const ownerType = body.owner_type || "user";
       const taskNumber = body.task_number;
 
@@ -350,19 +365,19 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         message: `"${target.title}" ${targetDate} tarihine ertelendi`,
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
       });
     }
 
     return new Response(JSON.stringify({ error: "Not found" }), {
       status: 404,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
     });
 
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
     });
   }
 });
