@@ -265,6 +265,7 @@ class TaskCard extends ConsumerWidget {
   void _showEditDialog(BuildContext context, WidgetRef ref) {
     final titleController = TextEditingController(text: task.title);
     final descController = TextEditingController(text: task.description ?? '');
+    final descFocusNode = FocusNode();
 
     void saveEdit(BuildContext dialogContext) {
       final descText = descController.text.trim();
@@ -313,33 +314,37 @@ class TaskCard extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Görevi Düzenle'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(labelText: 'Başlık'),
-            ),
-            const SizedBox(height: 8),
-            KeyboardListener(
-              focusNode: FocusNode(),
-              onKeyEvent: (event) {
-                if (event is KeyDownEvent &&
-                    event.logicalKey == LogicalKeyboardKey.enter &&
-                    HardwareKeyboard.instance.isControlPressed) {
-                  saveEdit(dialogContext);
-                }
-              },
-              child: TextField(
+        content: KeyboardListener(
+          focusNode: FocusNode(),
+          onKeyEvent: (event) {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.enter &&
+                HardwareKeyboard.instance.isControlPressed) {
+              saveEdit(dialogContext);
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(labelText: 'Başlık'),
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => descFocusNode.requestFocus(),
+              ),
+              const SizedBox(height: 8),
+              TextField(
                 controller: descController,
+                focusNode: descFocusNode,
                 decoration: const InputDecoration(
                   labelText: 'Açıklama',
                   hintText: '* ile yeni alt görev ekle\nCtrl+Enter ile kaydet',
                 ),
                 maxLines: 5,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(

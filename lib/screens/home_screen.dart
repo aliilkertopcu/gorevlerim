@@ -9,6 +9,7 @@ import '../widgets/task_card.dart';
 import '../widgets/task_form.dart';
 import '../widgets/group_selector.dart';
 import '../widgets/group_manager.dart';
+import '../widgets/ai_setup_dialog.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -37,205 +38,237 @@ class HomeScreen extends ConsumerWidget {
                   currentDate.add(const Duration(days: 1));
             }
           },
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    // Custom AppBar - same width as content
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 8),
-                          const GroupSelector(),
-                          const SizedBox(width: 8),
-                          tasksAsync.when(
-                            data: (tasks) {
-                              final completed = tasks.where((t) => t.status == 'completed').length;
-                              return Text(
-                                '($completed/${tasks.length})',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              );
-                            },
-                            loading: () => const SizedBox.shrink(),
-                            error: (e, st) => const SizedBox.shrink(),
-                          ),
-                          const Spacer(),
-                          // Hamburger Menu
-                          PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert, color: Colors.white),
-                            tooltip: 'Menü',
-                            onSelected: (value) => _onMenuAction(context, ref, value),
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'groups',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.group),
-                                    SizedBox(width: 12),
-                                    Text('Grup Yönetimi'),
-                                  ],
-                                ),
+          child: RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(tasksStreamProvider);
+              try {
+                await ref.read(tasksStreamProvider.future);
+              } catch (_) {}
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        child: Column(
+                          children: [
+                            // Custom AppBar - same width as content
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                              const PopupMenuDivider(),
-                              PopupMenuItem(
-                                value: 'theme',
-                                child: Row(
-                                  children: [
-                                    Icon(_getThemeIcon(currentTheme)),
-                                    const SizedBox(width: 12),
-                                    const Text('Tema'),
-                                    const Spacer(),
-                                    Text(
-                                      _getThemeLabel(currentTheme),
-                                      style: TextStyle(
-                                        color: Theme.of(context).hintColor,
-                                        fontSize: 12,
+                              child: Row(
+                                children: [
+                                  const SizedBox(width: 8),
+                                  const GroupSelector(),
+                                  const SizedBox(width: 8),
+                                  tasksAsync.when(
+                                    data: (tasks) {
+                                      final completed = tasks.where((t) => t.status == 'completed').length;
+                                      return Text(
+                                        '($completed/${tasks.length})',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white.withValues(alpha: 0.8),
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      );
+                                    },
+                                    loading: () => const SizedBox.shrink(),
+                                    error: (e, st) => const SizedBox.shrink(),
+                                  ),
+                                  const Spacer(),
+                                  // Hamburger Menu
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert, color: Colors.white),
+                                    tooltip: 'Menü',
+                                    onSelected: (value) => _onMenuAction(context, ref, value),
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'ai',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.smart_toy),
+                                            SizedBox(width: 12),
+                                            Text('AI Entegrasyonu'),
+                                          ],
+                                        ),
                                       ),
+                                      const PopupMenuDivider(),
+                                      const PopupMenuItem(
+                                        value: 'groups',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.group),
+                                            SizedBox(width: 12),
+                                            Text('Grup Yönetimi'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuDivider(),
+                                      PopupMenuItem(
+                                        value: 'theme',
+                                        child: Row(
+                                          children: [
+                                            Icon(_getThemeIcon(currentTheme)),
+                                            const SizedBox(width: 12),
+                                            const Text('Tema'),
+                                            const Spacer(),
+                                            Text(
+                                              _getThemeLabel(currentTheme),
+                                              style: TextStyle(
+                                                color: Theme.of(context).hintColor,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuDivider(),
+                                      const PopupMenuItem(
+                                        value: 'logout',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.logout, color: Colors.red),
+                                            SizedBox(width: 12),
+                                            Text('Çıkış Yap', style: TextStyle(color: Colors.red)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const DateNav(),
+                            const SizedBox(height: 8),
+                            const TaskForm(),
+                            const SizedBox(height: 8),
+                            // Task list content
+                            tasksAsync.when(
+                              data: (tasks) {
+                                if (tasks.isEmpty) {
+                                  return Column(
+                                    children: [
+                                      const SizedBox(height: 80),
+                                      Icon(
+                                        Icons.task_alt,
+                                        size: 64,
+                                        color: Colors.grey[300],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'Bu gün için görev yok',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.grey[500],
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Yukarıdan yeni görev ekleyebilirsin',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.grey[400],
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }
+
+                                return ReorderableListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  buildDefaultDragHandles: false,
+                                  itemCount: tasks.length,
+                                  onReorder: (oldIndex, newIndex) {
+                                    if (newIndex > oldIndex) newIndex--;
+                                    ref.read(tasksNotifierProvider.notifier).optimisticReorderTasks(oldIndex, newIndex);
+                                    final movedId = tasks[oldIndex].id;
+                                    final taskIds = tasks.map((t) => t.id).toList();
+                                    taskIds.removeAt(oldIndex);
+                                    taskIds.insert(newIndex, movedId);
+                                    ref.read(taskServiceProvider).reorderTasks(
+                                      taskIds,
+                                      movedTaskId: movedId,
+                                      oldIndex: oldIndex,
+                                      newIndex: newIndex,
+                                    );
+                                  },
+                                  proxyDecorator: (child, index, animation) {
+                                    return Material(
+                                      elevation: 4,
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: child,
+                                    );
+                                  },
+                                  itemBuilder: (context, index) {
+                                    final task = tasks[index];
+                                    return TaskCard(
+                                      key: ValueKey(task.id),
+                                      task: task,
+                                      index: index,
+                                    );
+                                  },
+                                );
+                              },
+                              loading: () => const Padding(
+                                padding: EdgeInsets.all(48),
+                                child: Center(child: CircularProgressIndicator()),
+                              ),
+                              error: (error, _) => Padding(
+                                padding: const EdgeInsets.all(48),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                    const SizedBox(height: 12),
+                                    Text('Hata: $error'),
+                                    const SizedBox(height: 12),
+                                    ElevatedButton(
+                                      onPressed: () => ref.invalidate(tasksStreamProvider),
+                                      child: const Text('Tekrar Dene'),
                                     ),
                                   ],
                                 ),
                               ),
-                              const PopupMenuDivider(),
-                              const PopupMenuItem(
-                                value: 'logout',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.logout, color: Colors.red),
-                                    SizedBox(width: 12),
-                                    Text('Çıkış Yap', style: TextStyle(color: Colors.red)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const DateNav(),
-                    const SizedBox(height: 8),
-                    const TaskForm(),
-                    const SizedBox(height: 8),
-                    // Task list content
-                    tasksAsync.when(
-                      data: (tasks) {
-                        if (tasks.isEmpty) {
-                          return Column(
-                            children: [
-                              const SizedBox(height: 80),
-                              Icon(
-                                Icons.task_alt,
-                                size: 64,
-                                color: Colors.grey[300],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Bu gün için görev yok',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.grey[500],
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Yukarıdan yeni görev ekleyebilirsin',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.grey[400],
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 80),
-                              _buildFooter(context),
-                            ],
-                          );
-                        }
-
-                        return Column(
-                          children: [
-                            ReorderableListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              buildDefaultDragHandles: false,
-                              itemCount: tasks.length,
-                              onReorder: (oldIndex, newIndex) {
-                                if (newIndex > oldIndex) newIndex--;
-                                ref.read(tasksNotifierProvider.notifier).optimisticReorderTasks(oldIndex, newIndex);
-                                final movedId = tasks[oldIndex].id;
-                                final taskIds = tasks.map((t) => t.id).toList();
-                                taskIds.removeAt(oldIndex);
-                                taskIds.insert(newIndex, movedId);
-                                ref.read(taskServiceProvider).reorderTasks(
-                                  taskIds,
-                                  movedTaskId: movedId,
-                                  oldIndex: oldIndex,
-                                  newIndex: newIndex,
-                                );
-                              },
-                              proxyDecorator: (child, index, animation) {
-                                return Material(
-                                  elevation: 4,
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: child,
-                                );
-                              },
-                              itemBuilder: (context, index) {
-                                final task = tasks[index];
-                                return TaskCard(
-                                  key: ValueKey(task.id),
-                                  task: task,
-                                  index: index,
-                                );
-                              },
-                            ),
-                            _buildFooter(context),
-                          ],
-                        );
-                      },
-                      loading: () => const Padding(
-                        padding: EdgeInsets.all(48),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                      error: (error, _) => Padding(
-                        padding: const EdgeInsets.all(48),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                            const SizedBox(height: 12),
-                            Text('Hata: $error'),
-                            const SizedBox(height: 12),
-                            ElevatedButton(
-                              onPressed: () => ref.invalidate(tasksStreamProvider),
-                              child: const Text('Tekrar Dene'),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Container(
+                    alignment: Alignment.bottomCenter,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        child: _buildFooter(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -245,6 +278,11 @@ class HomeScreen extends ConsumerWidget {
 
   void _onMenuAction(BuildContext context, WidgetRef ref, String action) {
     switch (action) {
+      case 'ai':
+        showDialog(
+          context: context,
+          builder: (_) => const AISetupDialog(),
+        );
       case 'groups':
         showDialog(
           context: context,
