@@ -20,6 +20,8 @@ class _AISetupDialogState extends ConsumerState<AISetupDialog> {
   String? _prompt;
   bool _loading = true;
   bool _copied = false;
+  bool _keyCopied = false;
+  DateTime? _longPressStart;
 
   @override
   void initState() {
@@ -63,6 +65,38 @@ class _AISetupDialogState extends ConsumerState<AISetupDialog> {
         const SnackBar(content: Text('API anahtarı yenilendi')),
       );
     }
+  }
+
+  void _copyApiKey() {
+    if (_apiKey == null) return;
+    Clipboard.setData(ClipboardData(text: _apiKey!));
+    setState(() => _keyCopied = true);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _keyCopied = false);
+    });
+  }
+
+  Future<void> _confirmRegenerate() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('API Anahtarını Yenile'),
+        content: const Text(
+          'Mevcut anahtarınız geçersiz olacak ve AI entegrasyonlarınızı yeni anahtarla güncellemeniz gerekecek.\n\nDevam etmek istiyor musunuz?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('İptal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Yenile'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) _regenerateKey();
   }
 
   void _copyPrompt() {
@@ -142,35 +176,51 @@ class _AISetupDialogState extends ConsumerState<AISetupDialog> {
                           const SizedBox(height: 16),
 
                           // API Key display
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.grey[900] : Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                          GestureDetector(
+                            onLongPressStart: (_) {
+                              _longPressStart = DateTime.now();
+                            },
+                            onLongPressEnd: (_) {
+                              if (_longPressStart != null) {
+                                final held = DateTime.now().difference(_longPressStart!);
+                                _longPressStart = null;
+                                if (held.inSeconds >= 5) _confirmRegenerate();
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.grey[900] : Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                                ),
                               ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.key, size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _apiKey ?? '',
-                                    style: TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: 12,
-                                      color: Theme.of(context).colorScheme.onSurface,
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.key, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _apiKey ?? '',
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.refresh, size: 18),
-                                  onPressed: _regenerateKey,
-                                  tooltip: 'Yeni anahtar oluştur',
-                                ),
-                              ],
+                                  IconButton(
+                                    icon: Icon(
+                                      _keyCopied ? Icons.check : Icons.copy,
+                                      size: 18,
+                                    ),
+                                    onPressed: _copyApiKey,
+                                    tooltip: 'API anahtarını kopyala',
+                                    color: _keyCopied ? Colors.green : null,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
 
