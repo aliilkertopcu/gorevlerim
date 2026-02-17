@@ -15,6 +15,13 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.18.4',
+    date: '2026-02-17',
+    features: [
+      'Basılı tutma eşiği 300ms — scroll ve swipe sırasında animasyon tetiklenmiyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.18.3',
     date: '2026-02-17',
     features: [

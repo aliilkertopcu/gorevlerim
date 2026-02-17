@@ -753,6 +753,10 @@ class _PressableCardState extends State<_PressableCard>
   bool _isHovered = false;
   Timer? _thresholdTimer;
   late AnimationController _pressController;
+  Offset? _initialPosition;
+  bool _movementCancelled = false;
+
+  static const _moveThreshold = 10.0;
 
   @override
   void initState() {
@@ -770,17 +774,30 @@ class _PressableCardState extends State<_PressableCard>
     super.dispose();
   }
 
-  void _onPointerDown(PointerDownEvent _) {
+  void _onPointerDown(PointerDownEvent event) {
+    _initialPosition = event.position;
+    _movementCancelled = false;
     _thresholdTimer?.cancel();
-    _thresholdTimer = Timer(const Duration(milliseconds: 100), () {
-      if (mounted) {
+    _thresholdTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && !_movementCancelled) {
         _pressController.forward();
       }
     });
   }
 
+  void _onPointerMove(PointerMoveEvent event) {
+    if (_initialPosition != null && !_movementCancelled) {
+      final distance = (event.position - _initialPosition!).distance;
+      if (distance > _moveThreshold) {
+        _movementCancelled = true;
+        _cancelPress();
+      }
+    }
+  }
+
   void _cancelPress() {
     _thresholdTimer?.cancel();
+    _initialPosition = null;
     if (_pressController.isAnimating || _pressController.value > 0) {
       _pressController.reverse();
     }
@@ -790,6 +807,7 @@ class _PressableCardState extends State<_PressableCard>
   Widget build(BuildContext context) {
     return Listener(
       onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
       onPointerUp: (_) => _cancelPress(),
       onPointerCancel: (_) => _cancelPress(),
       child: MouseRegion(
