@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
+import '../providers/task_provider.dart';
 
 class InviteScreen extends ConsumerWidget {
   final String token;
@@ -241,11 +242,15 @@ class _JoinButtonState extends ConsumerState<_JoinButton> {
     });
 
     try {
-      await ref.read(groupServiceProvider).joinGroupByInvite(
+      final group = await ref.read(groupServiceProvider).joinGroupByInvite(
         token: widget.token,
         userId: user.id,
       );
       ref.invalidate(userGroupsProvider);
+      // Switch view to the joined group
+      final owner = OwnerContext(ownerId: group.id, ownerType: 'group');
+      ref.read(ownerContextProvider.notifier).state = owner;
+      ViewStatePersistence.saveOwnerContext(owner);
       if (mounted) {
         setState(() {
           _isLoading = false;
