@@ -125,17 +125,18 @@ class TaskService {
     required String createdBy,
     List<String> subtaskTitles = const [],
   }) async {
-    // Get max sort_order for this date
+    // Get min sort_order for this date — new tasks go to top
     final existing = await _client
         .from('tasks')
         .select('sort_order')
         .eq('owner_id', ownerId)
         .eq('owner_type', ownerType)
         .eq('date', _dateKey(date))
-        .order('sort_order', ascending: false)
+        .neq('status', 'deleted')
+        .order('sort_order', ascending: true)
         .limit(1);
 
-    final nextOrder = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) + 1;
+    final nextOrder = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) - 1000;
 
     final taskData = await _client.from('tasks').insert({
       'owner_id': ownerId,
