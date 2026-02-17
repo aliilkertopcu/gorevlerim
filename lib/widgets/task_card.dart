@@ -29,6 +29,7 @@ class TaskCard extends ConsumerWidget {
     final isGroupTask = ref.watch(ownerContextProvider)?.ownerType == 'group';
     final group = ref.watch(currentGroupProvider);
     final permissionMode = group?.settings['task_edit_permission'] as String? ?? 'allow';
+    final editable = canEditTask(ref, task);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
@@ -53,9 +54,9 @@ class TaskCard extends ConsumerWidget {
                   children: [
                     // Checkbox
                     MouseRegion(
-                      cursor: SystemMouseCursors.click,
+                      cursor: editable ? SystemMouseCursors.click : MouseCursor.defer,
                       child: GestureDetector(
-                        onTap: () => _toggleComplete(ref),
+                        onTap: editable ? () => _toggleComplete(ref) : null,
                         child: Container(
                           width: 22,
                           height: 22,
@@ -84,9 +85,9 @@ class TaskCard extends ConsumerWidget {
                                   final notifier = ref.read(collapsedTasksProvider.notifier);
                                   final current = ref.read(collapsedTasksProvider);
                                   if (current.contains(task.id)) {
-                                    notifier.state = {...current}..remove(task.id);
+                                    notifier.update({...current}..remove(task.id));
                                   } else {
-                                    notifier.state = {...current, task.id};
+                                    notifier.update({...current, task.id});
                                   }
                                 }
                               : null,
@@ -159,12 +160,15 @@ class TaskCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  // Menu
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
-                    itemBuilder: (context) => _buildMenuItems(ref),
-                    onSelected: (value) => _onMenuAction(context, ref, value),
-                  ),
+                  // Menu (hidden when not editable, unless lock toggle is available)
+                  if (editable || _hasLockToggle(ref))
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
+                      itemBuilder: (context) => _buildMenuItems(ref),
+                      onSelected: (value) => _onMenuAction(context, ref, value),
+                    )
+                  else
+                    const SizedBox(width: 8),
                 ],
                 ),
               ),
@@ -201,55 +205,84 @@ class TaskCard extends ConsumerWidget {
             if (task.subtasks.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(30, 0, 8, 8),
-                child: ReorderableListView(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  buildDefaultDragHandles: false,
-                  proxyDecorator: (child, idx, animation) {
-                    return Opacity(
-                      opacity: 0.85,
-                      child: Material(
-                        elevation: 4,
-                        borderRadius: BorderRadius.circular(4),
-                        child: child,
-                      ),
-                    );
-                  },
-                  onReorder: (oldIndex, newIndex) {
-                    if (newIndex > oldIndex) newIndex--;
-                    ref.read(tasksNotifierProvider.notifier).optimisticReorderSubtasks(task.id, oldIndex, newIndex);
-                    final movedId = task.subtasks[oldIndex].id;
-                    final ids = task.subtasks.map((s) => s.id).toList();
-                    ids.removeAt(oldIndex);
-                    ids.insert(newIndex, movedId);
-                    ref.read(taskServiceProvider).reorderSubtasks(
-                      ids,
-                      movedSubtaskId: movedId,
-                      oldIndex: oldIndex,
-                      newIndex: newIndex,
-                    );
-                  },
-                  children: task.subtasks.asMap().entries.map((entry) {
-                    final idx = entry.key;
-                    final subtask = entry.value;
-                    return SubtaskItem(
-                      key: ValueKey(subtask.id),
-                      subtask: subtask,
-                      parentTask: task,
-                      subtaskIndex: idx,
-                      onToggle: () => _toggleSubtask(ref, subtask),
-                      onDelete: () => _deleteSubtask(ref, subtask),
-                      onBlock: () => _blockSubtask(context, ref, subtask),
-                      onEdit: () => _editSubtask(context, ref, subtask),
-                      onPromote: () => _promoteSubtask(ref, subtask),
-                    );
-                  }).toList(),
-                ),
+                child: editable
+                  ? ReorderableListView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      buildDefaultDragHandles: false,
+                      proxyDecorator: (child, idx, animation) {
+                        return Opacity(
+                          opacity: 0.85,
+                          child: Material(
+                            elevation: 4,
+                            borderRadius: BorderRadius.circular(4),
+                            child: child,
+                          ),
+                        );
+                      },
+                      onReorder: (oldIndex, newIndex) {
+                        if (newIndex > oldIndex) newIndex--;
+                        ref.read(tasksNotifierProvider.notifier).optimisticReorderSubtasks(task.id, oldIndex, newIndex);
+                        final movedId = task.subtasks[oldIndex].id;
+                        final ids = task.subtasks.map((s) => s.id).toList();
+                        ids.removeAt(oldIndex);
+                        ids.insert(newIndex, movedId);
+                        ref.read(taskServiceProvider).reorderSubtasks(
+                          ids,
+                          movedSubtaskId: movedId,
+                          oldIndex: oldIndex,
+                          newIndex: newIndex,
+                        );
+                      },
+                      children: task.subtasks.asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final subtask = entry.value;
+                        return SubtaskItem(
+                          key: ValueKey(subtask.id),
+                          subtask: subtask,
+                          parentTask: task,
+                          subtaskIndex: idx,
+                          onToggle: () => _toggleSubtask(ref, subtask),
+                          onDelete: () => _deleteSubtask(ref, subtask),
+                          onBlock: () => _blockSubtask(context, ref, subtask),
+                          onEdit: () => _editSubtask(context, ref, subtask),
+                          onPromote: () => _promoteSubtask(ref, subtask),
+                        );
+                      }).toList(),
+                    )
+                  : Column(
+                      children: task.subtasks.asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final subtask = entry.value;
+                        return SubtaskItem(
+                          key: ValueKey(subtask.id),
+                          subtask: subtask,
+                          parentTask: task,
+                          subtaskIndex: idx,
+                          editable: false,
+                          onToggle: () {},
+                          onDelete: () {},
+                          onBlock: () {},
+                          onEdit: () {},
+                          onPromote: () {},
+                        );
+                      }).toList(),
+                    ),
               ),
           ],
         ],
       ),
     );
+  }
+
+  bool _hasLockToggle(WidgetRef ref) {
+    final isGroupTask = ref.read(ownerContextProvider)?.ownerType == 'group';
+    final group = ref.read(currentGroupProvider);
+    final user = ref.read(currentUserProvider);
+    final permissionMode = group?.settings['task_edit_permission'] as String? ?? 'allow';
+    final isCreator = group != null && user != null && group.createdBy == user.id;
+    final isTaskOwner = user != null && task.createdBy == user.id;
+    return isGroupTask && permissionMode == 'per_task' && (isTaskOwner || isCreator);
   }
 
   List<PopupMenuEntry<String>> _buildMenuItems(WidgetRef ref) {
@@ -470,7 +503,7 @@ class TaskCard extends ConsumerWidget {
                 labelText: 'Açıklama & Alt Görevler',
                 hintText: '* ile alt görev ekle/düzenle\nCtrl+Enter ile kaydet',
               ),
-              maxLines: 8,
+              maxLines: null,
               minLines: 4,
             ),
           ],

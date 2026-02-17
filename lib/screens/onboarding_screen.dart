@@ -124,7 +124,7 @@ class OnboardingScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
-                                  'Bir sabah daha kafam açılmamışken, dışarda Sofi\'nin kaka yapmasını beklerken, of bugün yapacak çok şey var, ulan şimdi aklıma gelir ama kesin unutucam ve kendinden memnuniyetsizlik hisleriyle bir duygu girdabı olmuş dönenirken, kendime ses kaydı atayım dedim. Aaa whatsapp yerine Claude üzerinden atayım, hem metne çevirir bidaha kendimin bomboş düşünen sessizliğini dinlemek zorunda kalmam dedim. O da olsun bu da olsun derken geldiğimiz nokta budur ahahahah',
+                                  'Bir sabah daha kafam açılmadan köpeği çıkartmıştım, hep gittiğimiz çimenlikte Sofi\'nin kaka yapmasını bekliyordum; tasma elimde. Kafamda parça pinçik bisürü cümle uçuşuyor, gözlerim çapaklı ve kısık 😂 "Of bugün yapacak çok şey var..", "Bunu kesin unutucam akşama kadar..", keşke daha erken kalksaydım yetişmeyecek bu gün de memnuniyetsizlik hisleriyle bir duygu girdabı olmuş dönenirken, kendime ses kaydı atayım dedim 💡 Aaa whatsapp yerine Claude üzerinden atayım, hem metne çevirir bidaha kendimin bomboş düşünen sessizliğini dinlemek zorunda kalmam dedim. O da olsun bu da olsun derken geldiğimiz nokta budur ahahahah 😆 Katıldığın ve katkıların için şimdiden çok teşekkürler!',
                                   style: TextStyle(
                                     fontSize: 15,
                                     height: 1.6,

@@ -12,6 +12,7 @@ class SubtaskItem extends StatelessWidget {
   final VoidCallback onBlock;
   final VoidCallback onEdit;
   final VoidCallback onPromote;
+  final bool editable;
 
   const SubtaskItem({
     super.key,
@@ -23,17 +24,14 @@ class SubtaskItem extends StatelessWidget {
     required this.onBlock,
     required this.onEdit,
     required this.onPromote,
+    this.editable = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final statusColor = AppTheme.statusColor(subtask.status);
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.grab,
-      child: CustomDelayDragStartListener(
-        index: subtaskIndex,
-        child: Container(
+    final inner = Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: subtask.isBlocked
@@ -45,9 +43,9 @@ class SubtaskItem extends StatelessWidget {
             children: [
               // Checkbox
               MouseRegion(
-                cursor: SystemMouseCursors.click,
+                cursor: editable ? SystemMouseCursors.click : MouseCursor.defer,
                 child: GestureDetector(
-                  onTap: onToggle,
+                  onTap: editable ? onToggle : null,
                   child: Container(
                     width: 18,
                     height: 18,
@@ -110,38 +108,49 @@ class SubtaskItem extends StatelessWidget {
                     style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600),
                   ),
                 ),
-              // Menu
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                  const PopupMenuItem(value: 'block', child: Text('Bloke Et')),
-                  const PopupMenuItem(value: 'promote', child: Text('Ana Göreve Dönüştür')),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Sil', style: TextStyle(color: Colors.red)),
-                  ),
-                ],
-                onSelected: (value) {
-                  switch (value) {
-                    case 'edit':
-                      onEdit();
-                    case 'block':
-                      onBlock();
-                    case 'promote':
-                      onPromote();
-                    case 'delete':
-                      onDelete();
-                  }
-                },
-              ),
+              // Menu (hidden when not editable)
+              if (editable)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
+                    const PopupMenuItem(value: 'block', child: Text('Bloke Et')),
+                    const PopupMenuItem(value: 'promote', child: Text('Ana Göreve Dönüştür')),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Sil', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'edit':
+                        onEdit();
+                      case 'block':
+                        onBlock();
+                      case 'promote':
+                        onPromote();
+                      case 'delete':
+                        onDelete();
+                    }
+                  },
+                ),
             ],
           ),
+        );
+
+    if (editable) {
+      return MouseRegion(
+        cursor: SystemMouseCursors.grab,
+        child: CustomDelayDragStartListener(
+          index: subtaskIndex,
+          child: inner,
         ),
-      ),
-    );
+      );
+    }
+
+    return inner;
   }
 }

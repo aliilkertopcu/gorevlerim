@@ -23,6 +23,9 @@ class HomeScreen extends ConsumerWidget {
     final currentTheme = ref.watch(themeNotifierProvider);
     final ownerColor = ref.watch(currentOwnerColorProvider);
 
+    // Restore persisted view state (last viewed group) on first build
+    ref.watch(viewStateInitProvider);
+
     return Scaffold(
       body: SafeArea(
         child: GestureDetector(
@@ -188,10 +191,10 @@ class HomeScreen extends ConsumerWidget {
                                   child: TextButton.icon(
                                     onPressed: () {
                                       if (allCollapsed) {
-                                        ref.read(collapsedTasksProvider.notifier).state = {};
+                                        ref.read(collapsedTasksProvider.notifier).update({});
                                       } else {
-                                        ref.read(collapsedTasksProvider.notifier).state =
-                                            tasks.map((t) => t.id).toSet();
+                                        ref.read(collapsedTasksProvider.notifier).update(
+                                            tasks.map((t) => t.id).toSet());
                                       }
                                     },
                                     icon: Icon(
