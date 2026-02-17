@@ -1,2 +1,2 @@
-const String appVersion = '0.19.0';
+const String appVersion = '0.19.1';
 const String appBuildDate = '2026-02-17';

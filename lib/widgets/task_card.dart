@@ -230,6 +230,7 @@ class TaskCard extends ConsumerWidget {
                           onToggle: () => _toggleSubtask(ref, subtask),
                           onDelete: () => _deleteSubtask(ref, subtask),
                           onBlock: () => _blockSubtask(context, ref, subtask),
+                          onUnblock: () => _unblockSubtask(ref, subtask),
                           onEdit: () => _editSubtask(context, ref, subtask),
                           onPromote: () => _promoteSubtask(ref, subtask),
                         );
@@ -632,13 +633,35 @@ class TaskCard extends ConsumerWidget {
   void _blockSubtask(BuildContext context, WidgetRef ref, Subtask subtask) {
     final reasonController = TextEditingController();
 
+    void doBlock(BuildContext ctx) {
+      final reason = reasonController.text.trim();
+      Navigator.pop(ctx);
+      ref.read(tasksNotifierProvider.notifier).optimisticBlockSubtask(task.id, subtask.id, reason.isEmpty ? null : reason);
+      ref.read(taskServiceProvider).blockSubtask(subtask.id, reason);
+      _logIfGroupTask(ref, 'subtask_blocked', '"${subtask.title}"');
+    }
+
     showAppDialog(
       context: context,
       title: const Text('Alt Görevi Bloke Et'),
-      content: TextField(
-        controller: reasonController,
-        decoration: const InputDecoration(labelText: 'Sebep'),
-        autofocus: true,
+      content: KeyboardListener(
+        focusNode: FocusNode(),
+        onKeyEvent: (event) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.enter &&
+              HardwareKeyboard.instance.isControlPressed) {
+            doBlock(context);
+          }
+        },
+        child: TextField(
+          controller: reasonController,
+          decoration: const InputDecoration(
+            labelText: 'Sebep',
+            hintText: 'Neden bloke edildi?\nCtrl+Enter ile kaydet',
+          ),
+          maxLines: 2,
+          autofocus: true,
+        ),
       ),
       actions: [
         TextButton(
@@ -646,13 +669,7 @@ class TaskCard extends ConsumerWidget {
           child: const Text('İptal'),
         ),
         ElevatedButton(
-          onPressed: () {
-            final reason = reasonController.text.trim();
-            Navigator.pop(context);
-            ref.read(tasksNotifierProvider.notifier).optimisticBlockSubtask(task.id, subtask.id, reason.isEmpty ? null : reason);
-            ref.read(taskServiceProvider).blockSubtask(subtask.id, reason);
-            _logIfGroupTask(ref, 'subtask_blocked', '"${subtask.title}"');
-          },
+          onPressed: () => doBlock(context),
           style: ElevatedButton.styleFrom(backgroundColor: AppTheme.blockedColor),
           child: const Text('Bloke Et'),
         ),
@@ -660,18 +677,48 @@ class TaskCard extends ConsumerWidget {
     );
   }
 
+  void _unblockSubtask(WidgetRef ref, Subtask subtask) {
+    ref.read(tasksNotifierProvider.notifier).optimisticUnblockSubtask(task.id, subtask.id);
+    ref.read(taskServiceProvider).updateSubtask(subtask.id, {
+      'status': 'pending',
+      'block_reason': null,
+    });
+    _logIfGroupTask(ref, 'subtask_unblocked', '"${subtask.title}"');
+  }
+
   void _editSubtask(BuildContext context, WidgetRef ref, Subtask subtask) {
     final titleController = TextEditingController(text: subtask.title);
+
+    void doSave(BuildContext ctx) {
+      final newTitle = titleController.text.trim();
+      Navigator.pop(ctx);
+      ref.read(tasksNotifierProvider.notifier).optimisticUpdateSubtask(task.id, subtask.id, newTitle);
+      ref.read(taskServiceProvider).updateSubtask(subtask.id, {'title': newTitle});
+      _logIfGroupTask(ref, 'subtask_edited', '"${subtask.title}"');
+    }
 
     showAppDialog(
       context: context,
       title: const Text('Alt Görevi Düzenle'),
-      content: TextField(
-        controller: titleController,
-        decoration: const InputDecoration(labelText: 'Başlık'),
-        autofocus: true,
-        maxLines: null,
-        minLines: 2,
+      content: KeyboardListener(
+        focusNode: FocusNode(),
+        onKeyEvent: (event) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.enter &&
+              HardwareKeyboard.instance.isControlPressed) {
+            doSave(context);
+          }
+        },
+        child: TextField(
+          controller: titleController,
+          decoration: const InputDecoration(
+            labelText: 'Başlık',
+            hintText: 'Ctrl+Enter ile kaydet',
+          ),
+          autofocus: true,
+          maxLines: null,
+          minLines: 2,
+        ),
       ),
       actions: [
         TextButton(
@@ -679,13 +726,7 @@ class TaskCard extends ConsumerWidget {
           child: const Text('İptal'),
         ),
         ElevatedButton(
-          onPressed: () {
-            final newTitle = titleController.text.trim();
-            Navigator.pop(context);
-            ref.read(tasksNotifierProvider.notifier).optimisticUpdateSubtask(task.id, subtask.id, newTitle);
-            ref.read(taskServiceProvider).updateSubtask(subtask.id, {'title': newTitle});
-            _logIfGroupTask(ref, 'subtask_edited', '"${subtask.title}"');
-          },
+          onPressed: () => doSave(context),
           style: ElevatedButton.styleFrom(backgroundColor: ref.read(currentOwnerColorProvider)),
           child: const Text('Kaydet'),
         ),
