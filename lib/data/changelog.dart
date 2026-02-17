@@ -15,6 +15,16 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.19.1',
+    date: '2026-02-17',
+    fixes: [
+      'Bloke edilen alt görevler için "Blokeyi Kaldır" seçeneği eklendi',
+      'Bloke alt görev görselliği iyileştirildi — kenarlık, ikon ve arka plan renklendirmesi',
+      'Alt görev bloke ederken Ctrl+Enter ile kayıt desteği',
+      'Alt görev düzenleme popup\'ında Ctrl+Enter ile kayıt desteği',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.19.0',
     date: '2026-02-17',
     features: [

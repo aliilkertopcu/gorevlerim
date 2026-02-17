@@ -10,6 +10,7 @@ class SubtaskItem extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onDelete;
   final VoidCallback onBlock;
+  final VoidCallback? onUnblock;
   final VoidCallback onEdit;
   final VoidCallback onPromote;
   final bool editable;
@@ -22,6 +23,7 @@ class SubtaskItem extends StatelessWidget {
     required this.onToggle,
     required this.onDelete,
     required this.onBlock,
+    this.onUnblock,
     required this.onEdit,
     required this.onPromote,
     this.editable = true,
@@ -31,13 +33,18 @@ class SubtaskItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = AppTheme.statusColor(subtask.status);
 
+    final blockedColor = AppTheme.blockedColor;
+
     final inner = Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: subtask.isBlocked
-                ? AppTheme.statusBackground('blocked').withValues(alpha: 0.5)
+                ? blockedColor.withValues(alpha: 0.08)
                 : null,
             borderRadius: BorderRadius.circular(4),
+            border: subtask.isBlocked
+                ? Border.all(color: blockedColor.withValues(alpha: 0.25))
+                : null,
           ),
           child: Row(
             children: [
@@ -50,14 +57,24 @@ class SubtaskItem extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(3),
                     border: Border.all(
-                      color: subtask.isCompleted ? AppTheme.completedColor : Colors.grey,
+                      color: subtask.isCompleted
+                          ? AppTheme.completedColor
+                          : subtask.isBlocked
+                              ? blockedColor
+                              : Colors.grey,
                       width: 2,
                     ),
-                    color: subtask.isCompleted ? AppTheme.completedColor : Colors.transparent,
+                    color: subtask.isCompleted
+                        ? AppTheme.completedColor
+                        : subtask.isBlocked
+                            ? blockedColor.withValues(alpha: 0.15)
+                            : Colors.transparent,
                   ),
                   child: subtask.isCompleted
                       ? const Icon(Icons.check, size: 12, color: Colors.white)
-                      : null,
+                      : subtask.isBlocked
+                          ? Icon(Icons.block, size: 10, color: blockedColor)
+                          : null,
                 ),
               ),
               const SizedBox(width: 8),
@@ -113,7 +130,10 @@ class SubtaskItem extends StatelessWidget {
                   constraints: const BoxConstraints(),
                   itemBuilder: (context) => [
                     const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                    const PopupMenuItem(value: 'block', child: Text('Bloke Et')),
+                    PopupMenuItem(
+                      value: subtask.isBlocked ? 'unblock' : 'block',
+                      child: Text(subtask.isBlocked ? 'Blokeyi Kaldır' : 'Bloke Et'),
+                    ),
                     const PopupMenuItem(value: 'promote', child: Text('Ana Göreve Dönüştür')),
                     const PopupMenuDivider(),
                     const PopupMenuItem(
@@ -127,6 +147,8 @@ class SubtaskItem extends StatelessWidget {
                         onEdit();
                       case 'block':
                         onBlock();
+                      case 'unblock':
+                        onUnblock?.call();
                       case 'promote':
                         onPromote();
                       case 'delete':

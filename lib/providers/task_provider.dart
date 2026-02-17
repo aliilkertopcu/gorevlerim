@@ -150,6 +150,23 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     }).toList();
   }
 
+  /// Optimistic unblock subtask
+  void optimisticUnblockSubtask(String taskId, String subtaskId) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        final updatedSubtasks = task.subtasks.map((s) {
+          if (s.id == subtaskId) {
+            return s.copyWith(status: 'pending', blockReason: null);
+          }
+          return s;
+        }).toList();
+        return task.copyWith(subtasks: updatedSubtasks);
+      }
+      return task;
+    }).toList();
+  }
+
   /// Optimistic update task
   void optimisticUpdateTask(String taskId, {String? title, String? description}) {
     _markOptimisticUpdate();
