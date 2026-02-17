@@ -84,14 +84,97 @@ class GroupService {
     return group;
   }
 
-  /// Get group members
+  /// Get group members with profile info
   Future<List<Map<String, dynamic>>> getGroupMembers(String groupId) async {
     final members = await _client
         .from('group_members')
-        .select('user_id, profiles(display_name, email)')
+        .select('user_id, joined_at, profiles(display_name, email)')
         .eq('group_id', groupId);
 
     return List<Map<String, dynamic>>.from(members);
+  }
+
+  /// Remove a member from a group (creator only, enforced by RLS)
+  Future<void> removeMember({
+    required String groupId,
+    required String userId,
+  }) async {
+    await _client
+        .from('group_members')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('user_id', userId);
+  }
+
+  /// Update group name (creator only, enforced by RLS)
+  Future<void> updateGroupName({
+    required String groupId,
+    required String name,
+  }) async {
+    await _client
+        .from('groups')
+        .update({'name': name})
+        .eq('id', groupId);
+  }
+
+  /// Update group description (creator only, enforced by RLS)
+  Future<void> updateGroupDescription({
+    required String groupId,
+    required String? description,
+  }) async {
+    await _client
+        .from('groups')
+        .update({'description': description})
+        .eq('id', groupId);
+  }
+
+  /// Log a group activity
+  Future<void> logActivity({
+    required String groupId,
+    required String userId,
+    required String action,
+    String? details,
+  }) async {
+    await _client.from('group_activity_log').insert({
+      'group_id': groupId,
+      'user_id': userId,
+      'action': action,
+      'details': details,
+    });
+  }
+
+  /// Fetch group activity log
+  Future<List<Map<String, dynamic>>> getActivityLog(String groupId) async {
+    final logs = await _client
+        .from('group_activity_log')
+        .select('id, user_id, action, details, created_at, profiles(display_name)')
+        .eq('group_id', groupId)
+        .order('created_at', ascending: false)
+        .limit(50);
+
+    return List<Map<String, dynamic>>.from(logs);
+  }
+
+  /// Update group color (creator only, enforced by RLS)
+  Future<void> updateGroupColor({
+    required String groupId,
+    required String color,
+  }) async {
+    await _client
+        .from('groups')
+        .update({'color': color})
+        .eq('id', groupId);
+  }
+
+  /// Update group settings (creator only, enforced by RLS)
+  Future<void> updateGroupSettings({
+    required String groupId,
+    required Map<String, dynamic> settings,
+  }) async {
+    await _client
+        .from('groups')
+        .update({'settings': settings})
+        .eq('id', groupId);
   }
 
   /// Leave a group

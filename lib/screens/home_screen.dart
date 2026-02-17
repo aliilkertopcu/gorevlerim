@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
+import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/theme_provider.dart';
-import '../theme/app_theme.dart';
 import '../widgets/date_nav.dart';
 import '../widgets/task_card.dart';
 import '../widgets/task_form.dart';
@@ -18,6 +18,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksAsync = ref.watch(tasksProvider);
     final currentTheme = ref.watch(themeNotifierProvider);
+    final ownerColor = ref.watch(currentOwnerColorProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -60,7 +61,7 @@ class HomeScreen extends ConsumerWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppTheme.primaryColor,
+                                color: ownerColor,
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(

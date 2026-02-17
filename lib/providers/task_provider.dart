@@ -239,14 +239,18 @@ final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
   // Get optimistic local state
   final localTasks = ref.watch(tasksNotifierProvider);
 
-  // If stream has error, return error
-  if (streamAsync.hasError) {
-    return AsyncValue.error(streamAsync.error!, streamAsync.stackTrace ?? StackTrace.current);
-  }
-
-  // If we have local data, use it (optimistic)
+  // If we have local data, use it (optimistic) — even if stream temporarily errors
+  // This prevents flashing an error screen when app resumes from background
   if (localTasks.isNotEmpty) {
     return AsyncValue.data(localTasks);
+  }
+
+  // If stream has error and no local data, show loading and auto-retry
+  if (streamAsync.hasError) {
+    Future.delayed(const Duration(seconds: 2), () {
+      ref.invalidate(tasksStreamProvider);
+    });
+    return const AsyncValue.loading();
   }
 
   // If stream is loading and no local data, show loading
