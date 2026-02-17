@@ -293,7 +293,7 @@ class TaskCard extends ConsumerWidget {
     final descController = TextEditingController(text: parts.join('\n'));
 
 
-    void saveEdit(BuildContext dialogContext) {
+    Future<void> saveEdit(BuildContext dialogContext) async {
       final descText = descController.text.trim();
       final lines = descText.split('\n');
       final newSubtaskTitles = <String>[];
@@ -321,56 +321,59 @@ class TaskCard extends ConsumerWidget {
       );
 
       // Sync title/description with server
-      ref.read(taskServiceProvider).updateTask(task.id, {
+      await ref.read(taskServiceProvider).updateTask(task.id, {
         'title': newTitle,
         'description': cleanDesc.isEmpty ? null : cleanDesc,
       });
 
-      // Diff subtasks: delete removed, create new, reorder existing
+      // Diff subtasks: delete removed, create new, reorder all by text position
       final availableOriginals = [...task.subtasks]; // mutable copy
-      final toCreate = <String>[];
-      final keptIds = <String>[]; // IDs in new text order
+      // orderedEntries tracks each subtask in text order:
+      // kept entries have an ID, new entries have null ID (filled after creation)
+      final orderedEntries = <({String? id, String title})>[];
 
       for (final newSt in newSubtaskTitles) {
         final matchIdx = availableOriginals.indexWhere((s) => s.title == newSt);
         if (matchIdx != -1) {
-          keptIds.add(availableOriginals[matchIdx].id);
+          orderedEntries.add((id: availableOriginals[matchIdx].id, title: newSt));
           availableOriginals.removeAt(matchIdx);
         } else {
-          toCreate.add(newSt);
+          orderedEntries.add((id: null, title: newSt));
         }
       }
 
       // Delete subtasks that were removed from the list
       for (final removed in availableOriginals) {
         ref.read(tasksNotifierProvider.notifier).optimisticDeleteSubtask(task.id, removed.id);
-        ref.read(taskServiceProvider).deleteSubtask(removed.id);
+        await ref.read(taskServiceProvider).deleteSubtask(removed.id);
       }
 
-      // Create new subtasks
-      for (final st in toCreate) {
-        ref.read(taskServiceProvider).createSubtask(
-          taskId: task.id,
-          title: st,
-        );
+      // Create new subtasks and capture their IDs
+      final allIds = <String>[];
+      for (final entry in orderedEntries) {
+        if (entry.id != null) {
+          allIds.add(entry.id!);
+        } else {
+          final created = await ref.read(taskServiceProvider).createSubtask(
+            taskId: task.id,
+            title: entry.title,
+          );
+          allIds.add(created.id);
+        }
       }
 
-      // Reorder existing subtasks if order changed
-      final originalKeptIds = task.subtasks
-          .where((s) => keptIds.contains(s.id))
-          .map((s) => s.id)
-          .toList();
-      if (keptIds.length > 1 && keptIds.join() != originalKeptIds.join()) {
-        ref.read(taskServiceProvider).reorderSubtasks(
-          keptIds,
-          movedSubtaskId: keptIds.first,
+      // Reorder ALL subtasks (kept + new) to match text position
+      if (allIds.length > 1) {
+        await ref.read(taskServiceProvider).reorderSubtasks(
+          allIds,
+          movedSubtaskId: allIds.first,
           oldIndex: 0,
           newIndex: 0,
         );
       }
 
-      // Refresh stream if subtasks changed
-      if (toCreate.isNotEmpty || availableOriginals.isNotEmpty || keptIds.join() != originalKeptIds.join()) {
+      // Refresh stream after all server operations complete
+      if (orderedEntries.isNotEmpty || availableOriginals.isNotEmpty) {
         ref.invalidate(tasksStreamProvider);
       }
     }
