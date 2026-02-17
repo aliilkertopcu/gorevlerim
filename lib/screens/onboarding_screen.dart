@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/changelog.dart';
 import '../version.dart';
 import '../widgets/youtube_embed.dart';
@@ -135,6 +136,55 @@ class OnboardingScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
+                          // Links
+                          _buildCard(
+                            context,
+                            isDark: isDark,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Topluluğa Katıl',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.grey[200] : Colors.grey[800],
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                _buildLinkTile(
+                                  context,
+                                  isDark: isDark,
+                                  icon: Icons.smart_toy_outlined,
+                                  iconColor: const Color(0xFF10a37f),
+                                  title: 'ChatGPT ile Kullan',
+                                  description: 'Mesaj atarak görevlerini yönet. Custom GPT entegrasyonuyla sadece bu linke yazarak kullanabilirsin.',
+                                  url: 'https://chatgpt.com/g/g-698064fcef40819193c8d429b724f1b1-gorevlerim',
+                                ),
+                                const SizedBox(height: 10),
+                                _buildLinkTile(
+                                  context,
+                                  isDark: isDark,
+                                  icon: Icons.group_outlined,
+                                  iconColor: const Color(0xFF25D366),
+                                  title: 'WhatsApp Beta Grubu',
+                                  description: 'Geliştirme sürecine dahil ol, geri bildirimlerini paylaş, yeni özellikleri ilk sen dene.',
+                                  url: 'https://chat.whatsapp.com/CWjRZ4yf7eA6dqtpdna2cG',
+                                ),
+                                const SizedBox(height: 10),
+                                _buildLinkTile(
+                                  context,
+                                  isDark: isDark,
+                                  icon: Icons.task_alt,
+                                  iconColor: const Color(0xFF667eea),
+                                  title: 'Beta Test Grubuna Katıl',
+                                  description: 'Yapılacakları gör, bana görev aç, birlikte geliştirelim.',
+                                  url: 'https://aliilkertopcu.github.io/gorevlerim/#/invite/53975401d2d49d15a49d8bd19d067a04',
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
                           // Changelog
                           ...changelog.map((entry) => Padding(
                             padding: const EdgeInsets.only(bottom: 12),
@@ -184,6 +234,64 @@ class OnboardingScreen extends StatelessWidget {
         ],
       ),
       child: child,
+    );
+  }
+
+  Widget _buildLinkTile(
+    BuildContext context, {
+    required bool isDark,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String description,
+    required String url,
+  }) {
+    return InkWell(
+      onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 28, color: iconColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.grey[200] : Colors.grey[800],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.open_in_new,
+              size: 16,
+              color: isDark ? Colors.grey[500] : Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
-import '../theme/app_theme.dart';
 
 class GroupSelector extends ConsumerWidget {
   const GroupSelector({super.key});
@@ -12,36 +10,36 @@ class GroupSelector extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(userGroupsProvider);
     final owner = ref.watch(ownerContextProvider);
-    final user = ref.watch(currentUserProvider);
 
     return groupsAsync.when(
       data: (groups) {
-        final items = <_SelectorItem>[
-          _SelectorItem(
-            id: user?.id ?? '',
-            name: '\u{1F4CB} Günlük Görevler',
-            type: 'user',
-            color: AppTheme.primaryColor,
-          ),
-          ...groups.map((g) => _SelectorItem(
-            id: g.id,
-            name: g.name,
-            type: 'group',
-            color: _parseColor(g.color),
-          )),
-        ];
+        // Personal group first, then shared groups alphabetically
+        final sorted = [...groups]..sort((a, b) {
+          if (a.isPersonal && !b.isPersonal) return -1;
+          if (!a.isPersonal && b.isPersonal) return 1;
+          return a.name.compareTo(b.name);
+        });
 
-        final selectedId = owner?.ownerId ?? user?.id ?? '';
+        final items = sorted.map((g) => _SelectorItem(
+          id: g.id,
+          name: g.name,
+          color: _parseColor(g.color),
+        )).toList();
+
+        if (items.isEmpty) {
+          return const Text('...', style: TextStyle(color: Colors.white));
+        }
+
+        final selectedId = owner?.ownerId ?? items.first.id;
 
         return PopupMenuButton<String>(
           onSelected: (id) {
-            final item = items.firstWhere((i) => i.id == id);
-            final owner = OwnerContext(
-              ownerId: item.id,
-              ownerType: item.type,
+            final newOwner = OwnerContext(
+              ownerId: id,
+              ownerType: 'group',
             );
-            ref.read(ownerContextProvider.notifier).state = owner;
-            ViewStatePersistence.saveOwnerContext(owner);
+            ref.read(ownerContextProvider.notifier).state = newOwner;
+            ViewStatePersistence.saveOwnerContext(newOwner);
             ref.invalidate(tasksStreamProvider);
           },
           itemBuilder: (context) => items.map((item) {
@@ -61,7 +59,7 @@ class GroupSelector extends ConsumerWidget {
                   Text(item.name),
                   if (item.id == selectedId) ...[
                     const Spacer(),
-                    const Icon(Icons.check, size: 18, color: AppTheme.primaryColor),
+                    Icon(Icons.check, size: 18, color: item.color),
                   ],
                 ],
               ),
@@ -71,7 +69,7 @@ class GroupSelector extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                items.firstWhere((i) => i.id == selectedId, orElse: () => items.first).name,
+                items.where((i) => i.id == selectedId).firstOrNull?.name ?? items.first.name,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -98,13 +96,11 @@ class GroupSelector extends ConsumerWidget {
 class _SelectorItem {
   final String id;
   final String name;
-  final String type;
   final Color color;
 
   _SelectorItem({
     required this.id,
     required this.name,
-    required this.type,
     required this.color,
   });
 }

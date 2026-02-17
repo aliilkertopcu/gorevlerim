@@ -19,13 +19,14 @@ final userGroupsProvider = FutureProvider.autoDispose<List<Group>>((ref) async {
   return groupService.fetchUserGroups(user.id);
 });
 
-/// Provides the currently selected group (null if user's personal tasks)
+/// Provides the currently selected group (personal groups are now real groups too)
 final currentGroupProvider = Provider<Group?>((ref) {
   final owner = ref.watch(ownerContextProvider);
   final groupsAsync = ref.watch(userGroupsProvider);
 
-  if (owner == null || owner.ownerType == 'user') return null;
+  if (owner == null) return null;
 
+  // After migration, all owners are groups (including personal)
   return groupsAsync.when(
     data: (groups) => groups.where((g) => g.id == owner.ownerId).firstOrNull,
     loading: () => null,
@@ -33,26 +34,15 @@ final currentGroupProvider = Provider<Group?>((ref) {
   );
 });
 
-/// Provides the color for the currently selected owner (user or group)
+/// Provides the color for the currently selected owner
 final currentOwnerColorProvider = Provider<Color>((ref) {
-  final owner = ref.watch(ownerContextProvider);
-  final groupsAsync = ref.watch(userGroupsProvider);
-
-  if (owner == null || owner.ownerType == 'user') {
-    return AppTheme.primaryColor;
+  final group = ref.watch(currentGroupProvider);
+  if (group != null) {
+    final hex = group.color.replaceFirst('#', '');
+    final fullHex = hex.length == 6 ? 'FF$hex' : hex;
+    return Color(int.parse(fullHex, radix: 16));
   }
-
-  return groupsAsync.when(
-    data: (groups) {
-      final group = groups.where((g) => g.id == owner.ownerId).firstOrNull;
-      if (group == null) return AppTheme.primaryColor;
-      final hex = group.color.replaceFirst('#', '');
-      final fullHex = hex.length == 6 ? 'FF$hex' : hex;
-      return Color(int.parse(fullHex, radix: 16));
-    },
-    loading: () => AppTheme.primaryColor,
-    error: (_, _) => AppTheme.primaryColor,
-  );
+  return AppTheme.primaryColor;
 });
 
 /// Provides invites for a group

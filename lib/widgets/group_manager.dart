@@ -141,7 +141,9 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
                               ),
                             ),
                             title: Text(group.name),
-                            subtitle: Text('Davet kodu: ${group.inviteCode}'),
+                            subtitle: group.isPersonal
+                                ? const Text('Kişisel grup')
+                                : Text('Davet kodu: ${group.inviteCode}'),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () {
                               setState(() => _selectedGroup = group);
@@ -339,7 +341,11 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
     _currentDescription = widget.group.description ?? '';
     _nameController = TextEditingController(text: _currentName);
     _descriptionController = TextEditingController(text: _currentDescription);
-    _loadMembers();
+    if (!widget.group.isPersonal) {
+      _loadMembers();
+    } else {
+      _isLoadingMembers = false;
+    }
     _logScrollController.addListener(_onLogScroll);
   }
 
@@ -544,9 +550,11 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Invite code
-                    _buildInviteCode(),
-                    const SizedBox(height: 16),
+                    // Invite code (not for personal groups)
+                    if (!widget.group.isPersonal) ...[
+                      _buildInviteCode(),
+                      const SizedBox(height: 16),
+                    ],
                     // Description
                     _buildDescription(),
                     const SizedBox(height: 16),
@@ -555,26 +563,29 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
                       _buildColorPicker(groupColor),
                       const SizedBox(height: 16),
                     ],
-                    // Members
-                    _buildMembersList(),
-                    const SizedBox(height: 16),
+                    // Members (not for personal groups)
+                    if (!widget.group.isPersonal) ...[
+                      _buildMembersList(),
+                      const SizedBox(height: 16),
+                    ],
                     // Settings section (creator only)
                     if (_isCreator) ...[
                       _buildSettingsSection(),
                       const SizedBox(height: 16),
                     ],
-                    // Invite links (creator only)
-                    if (_isCreator) ...[
+                    // Invite links (creator only, not for personal groups)
+                    if (_isCreator && !widget.group.isPersonal) ...[
                       _buildInviteLinksSection(),
                       const SizedBox(height: 16),
                     ],
-                    // Activity log
-                    if (_canViewActivityLog) ...[
+                    // Activity log (not for personal groups)
+                    if (!widget.group.isPersonal && _canViewActivityLog) ...[
                       _buildActivityLog(),
                       const SizedBox(height: 16),
                     ],
-                    // Leave / Delete
-                    _buildActionButtons(),
+                    // Leave / Delete (not for personal groups)
+                    if (!widget.group.isPersonal)
+                      _buildActionButtons(),
                   ],
                 ),
               ),
@@ -892,6 +903,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
   Widget _buildSettingsSection() {
     final logVisibility = widget.group.settings['activity_log_visibility'] as String? ?? 'creator_only';
     final taskEditPermission = widget.group.settings['task_edit_permission'] as String? ?? 'allow';
+    final showPastIncomplete = widget.group.settings['show_past_incomplete'] as bool? ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -905,7 +917,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
           ),
         ),
         const SizedBox(height: 8),
-        // Task edit permission setting
+        // Show past incomplete tasks toggle
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
@@ -914,65 +926,93 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
           ),
           child: Row(
             children: [
-              Icon(Icons.edit_note, size: 18, color: Theme.of(context).hintColor),
+              Icon(Icons.history_toggle_off, size: 18, color: Theme.of(context).hintColor),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Görev düzenleme',
+                  'Yapılmamış görevleri bugüne taşı',
                   style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
                 ),
               ),
-              DropdownButton<String>(
-                value: taskEditPermission,
-                underline: const SizedBox(),
-                isDense: true,
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface),
-                items: const [
-                  DropdownMenuItem(value: 'allow', child: Text('Herkes')),
-                  DropdownMenuItem(value: 'deny', child: Text('Sadece sahibi')),
-                  DropdownMenuItem(value: 'per_task', child: Text('Görev bazlı')),
-                ],
-                onChanged: (value) {
-                  if (value != null) _updateTaskEditPermission(value);
-                },
+              Switch(
+                value: showPastIncomplete,
+                onChanged: (value) => _updateShowPastIncomplete(value),
+                activeTrackColor: _parseColor(_currentColor),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        // Activity log visibility setting
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: Theme.of(context).hintColor.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.history, size: 18, color: Theme.of(context).hintColor),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Geçmiş logu',
-                  style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
+        // Task edit permission setting (not for personal groups)
+        if (!widget.group.isPersonal) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Theme.of(context).hintColor.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.edit_note, size: 18, color: Theme.of(context).hintColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Görev düzenleme',
+                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
+                  ),
                 ),
-              ),
-              DropdownButton<String>(
-                value: logVisibility,
-                underline: const SizedBox(),
-                isDense: true,
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface),
-                items: const [
-                  DropdownMenuItem(value: 'creator_only', child: Text('Sadece kurucu')),
-                  DropdownMenuItem(value: 'all_members', child: Text('Tüm üyeler')),
-                ],
-                onChanged: (value) {
-                  if (value != null) _updateLogVisibility(value);
-                },
-              ),
-            ],
+                DropdownButton<String>(
+                  value: taskEditPermission,
+                  underline: const SizedBox(),
+                  isDense: true,
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface),
+                  items: const [
+                    DropdownMenuItem(value: 'allow', child: Text('Herkes')),
+                    DropdownMenuItem(value: 'deny', child: Text('Sadece sahibi')),
+                    DropdownMenuItem(value: 'per_task', child: Text('Görev bazlı')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) _updateTaskEditPermission(value);
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 8),
+          // Activity log visibility setting
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Theme.of(context).hintColor.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.history, size: 18, color: Theme.of(context).hintColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Geçmiş logu',
+                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
+                  ),
+                ),
+                DropdownButton<String>(
+                  value: logVisibility,
+                  underline: const SizedBox(),
+                  isDense: true,
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface),
+                  items: const [
+                    DropdownMenuItem(value: 'creator_only', child: Text('Sadece kurucu')),
+                    DropdownMenuItem(value: 'all_members', child: Text('Tüm üyeler')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) _updateLogVisibility(value);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1057,7 +1097,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
         : null;
     final isExpired = expiresAt != null && expiresAt.isBefore(DateTime.now());
     final base = Uri.base.toString().replaceAll(RegExp(r'#.*$'), '');
-    final inviteUrl = '${base}#/invite/$token';
+    final inviteUrl = '$base#/invite/$token';
 
     String expiryText;
     if (expiresAt == null) {
@@ -1435,6 +1475,26 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
     }
   }
 
+  Future<void> _updateShowPastIncomplete(bool value) async {
+    final newSettings = {...widget.group.settings, 'show_past_incomplete': value};
+    try {
+      await ref.read(groupServiceProvider).updateGroupSettings(
+        groupId: widget.group.id,
+        settings: newSettings,
+      );
+      _logActivity('settings_changed', details: 'Yapılmamış görevleri taşı: ${value ? 'açık' : 'kapalı'}');
+      widget.onGroupUpdated(widget.group.copyWith(settings: newSettings));
+      ref.invalidate(userGroupsProvider);
+      ref.invalidate(tasksStreamProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ayar güncellenemedi: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _updateLogVisibility(String visibility) async {
     final newSettings = {...widget.group.settings, 'activity_log_visibility': visibility};
     try {
@@ -1624,15 +1684,15 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
 
     setState(() => _isLoading = true);
     try {
-      // If currently viewing this group's tasks, switch back to personal
+      // If currently viewing this group's tasks, switch to personal group
       final owner = ref.read(ownerContextProvider);
       if (owner?.ownerId == widget.group.id) {
-        final user = ref.read(currentUserProvider);
-        if (user != null) {
-          ref.read(ownerContextProvider.notifier).state = OwnerContext(
-            ownerId: user.id,
-            ownerType: 'user',
-          );
+        final groups = await ref.read(userGroupsProvider.future);
+        final personalGroup = groups.where((g) => g.isPersonal).firstOrNull;
+        if (personalGroup != null) {
+          final newOwner = OwnerContext(ownerId: personalGroup.id, ownerType: 'group');
+          ref.read(ownerContextProvider.notifier).state = newOwner;
+          ViewStatePersistence.saveOwnerContext(newOwner);
           ref.invalidate(tasksStreamProvider);
         }
       }
@@ -1681,14 +1741,17 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
       final user = ref.read(currentUserProvider);
       if (user == null) return;
 
-      // If currently viewing this group's tasks, switch back to personal
+      // If currently viewing this group's tasks, switch to personal group
       final owner = ref.read(ownerContextProvider);
       if (owner?.ownerId == widget.group.id) {
-        ref.read(ownerContextProvider.notifier).state = OwnerContext(
-          ownerId: user.id,
-          ownerType: 'user',
-        );
-        ref.invalidate(tasksStreamProvider);
+        final groups = await ref.read(userGroupsProvider.future);
+        final personalGroup = groups.where((g) => g.isPersonal).firstOrNull;
+        if (personalGroup != null) {
+          final newOwner = OwnerContext(ownerId: personalGroup.id, ownerType: 'group');
+          ref.read(ownerContextProvider.notifier).state = newOwner;
+          ViewStatePersistence.saveOwnerContext(newOwner);
+          ref.invalidate(tasksStreamProvider);
+        }
       }
 
       await ref.read(groupServiceProvider).leaveGroup(

@@ -15,6 +15,16 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.19.0',
+    date: '2026-02-17',
+    features: [
+      'Kişisel grup artık düzenlenebilir — isim, renk, açıklama, ayarlar',
+      'Yeni kullanıcılar için otomatik kişisel grup oluşturma',
+      'Yapılmamış görevleri bugüne taşı ayarı — geçmiş günlerdeki tamamlanmamış görevler bugünde görünür',
+      'Onboarding sayfasına topluluk linkleri — ChatGPT, WhatsApp, beta test grubu',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.18.5',
     date: '2026-02-17',
     fixes: [

@@ -16,18 +16,17 @@ final selectedDateProvider = StateProvider<DateTime>((ref) {
   return DateTime(now.year, now.month, now.day);
 });
 
-/// Current owner context: user's own tasks or a group's tasks
+/// Current owner context: always a group (personal or shared)
 class OwnerContext {
   final String ownerId;
-  final String ownerType; // 'user' or 'group'
+  final String ownerType; // always 'group' after migration
 
   const OwnerContext({required this.ownerId, required this.ownerType});
 }
 
 final ownerContextProvider = StateProvider<OwnerContext?>((ref) {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return null;
-  return OwnerContext(ownerId: user.id, ownerType: 'user');
+  // Default is null — viewStateInitProvider sets the actual value on startup
+  return null;
 });
 
 /// Optimistic state for tasks - allows instant UI updates
@@ -232,11 +231,16 @@ final tasksStreamProvider = StreamProvider.autoDispose<List<Task>>((ref) {
     return Stream.value([]);
   }
 
+  // Check group's show_past_incomplete setting
+  final group = ref.watch(currentGroupProvider);
+  final showPastIncomplete = group?.settings['show_past_incomplete'] as bool? ?? false;
+
   return taskService
       .streamTasksWithSubtasks(
         ownerId: owner.ownerId,
         ownerType: owner.ownerType,
         date: date,
+        showPastIncomplete: showPastIncomplete,
       )
       .map((tasks) {
     // Sync server data to local state
@@ -327,17 +331,32 @@ class ViewStatePersistence {
   }
 }
 
-/// Restores persisted view state (last viewed group) on app start.
-/// Watch this in HomeScreen to trigger restoration.
+/// Restores persisted view state on app start.
+/// Falls back to the personal group if no saved state or saved group no longer exists.
 final viewStateInitProvider = FutureProvider<void>((ref) async {
-  final saved = await ViewStatePersistence.loadOwnerContext();
-  if (saved == null || saved.ownerType == 'user') return;
-
-  // Wait for groups to load and validate the saved group still exists
   final groups = await ref.read(userGroupsProvider.future);
-  final groupExists = groups.any((g) => g.id == saved.ownerId);
-  if (groupExists) {
-    ref.read(ownerContextProvider.notifier).state = saved;
+  if (groups.isEmpty) return;
+
+  final saved = await ViewStatePersistence.loadOwnerContext();
+
+  // Try to restore saved group
+  if (saved != null) {
+    final groupExists = groups.any((g) => g.id == saved.ownerId);
+    if (groupExists) {
+      ref.read(ownerContextProvider.notifier).state = saved;
+      return;
+    }
+  }
+
+  // Default to personal group
+  final personalGroup = groups.where((g) => g.isPersonal).firstOrNull;
+  if (personalGroup != null) {
+    final owner = OwnerContext(ownerId: personalGroup.id, ownerType: 'group');
+    ref.read(ownerContextProvider.notifier).state = owner;
+  } else if (groups.isNotEmpty) {
+    // Fallback: first available group
+    final owner = OwnerContext(ownerId: groups.first.id, ownerType: 'group');
+    ref.read(ownerContextProvider.notifier).state = owner;
   }
 });
 
@@ -346,13 +365,11 @@ bool canEditTask(WidgetRef ref, Task task) {
   final user = ref.read(currentUserProvider);
   if (user == null) return false;
 
-  // Personal tasks — always editable
-  final owner = ref.read(ownerContextProvider);
-  if (owner == null || owner.ownerType == 'user') return true;
-
-  // Group context
   final group = ref.read(currentGroupProvider);
   if (group == null) return true;
+
+  // Personal group — always editable
+  if (group.isPersonal) return true;
 
   // Group creator bypasses all restrictions
   if (group.createdBy == user.id) return true;
