@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../version.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -390,12 +392,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       ),
                       const SizedBox(height: 24),
                       // Footer
-                      Text(
-                        'made with curiosity \u{1F9E0}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontWeight: FontWeight.w300,
+                      GestureDetector(
+                        onTap: () => GoRouter.of(context).push('/onboarding'),
+                        child: Column(
+                          children: [
+                            Text(
+                              'made with curiosity \u{1F9E0}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withValues(alpha: 0.5),
+                                fontWeight: FontWeight.w300,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'v$appVersion',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white.withValues(alpha: 0.4),
+                                fontWeight: FontWeight.w300,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
