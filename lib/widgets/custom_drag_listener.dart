@@ -10,7 +10,7 @@ class CustomDelayDragStartListener extends ReorderableDragStartListener {
     super.key,
     required super.index,
     required super.child,
-    this.delay = const Duration(milliseconds: 500),
+    this.delay = const Duration(milliseconds: 700),
   });
 
   @override
