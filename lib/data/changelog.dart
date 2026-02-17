@@ -15,6 +15,19 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.18.1',
+    date: '2026-02-17',
+    features: [
+      'Düzenleme izni olmayan üyeler artık görev statüsünü, alt görev sıralamasını değiştiremez',
+      'İzinsiz üyelere hamburger menü gizleniyor (ana görev + alt görevler)',
+      'Popup pencereler resize edildiğinde tüm ekranı kaplayabiliyor',
+      'Sayfa yenilendiğinde son görüntülenen grup ve açık/kapalı görev durumu korunuyor',
+    ],
+    fixes: [
+      'Hikaye metni güncellendi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.18.0',
     date: '2026-02-17',
     features: [

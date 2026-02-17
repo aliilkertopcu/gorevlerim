@@ -131,7 +131,7 @@ class TaskForm extends ConsumerWidget {
               decoration: const InputDecoration(
                 hintText: 'Açıklama (opsiyonel)\n* ile alt görev ekle\nCtrl+Enter ile ekle',
               ),
-              maxLines: 4,
+              maxLines: null,
               minLines: 2,
             ),
           ],

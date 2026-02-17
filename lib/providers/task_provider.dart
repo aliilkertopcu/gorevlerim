@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ignore: depend_on_referenced_packages
 import 'package:riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
 import '../services/task_service.dart';
 import 'auth_provider.dart';
@@ -245,7 +246,34 @@ final tasksStreamProvider = StreamProvider.autoDispose<List<Task>>((ref) {
 });
 
 /// Tracks which tasks are collapsed. Empty set = all expanded (default).
-final collapsedTasksProvider = StateProvider<Set<String>>((ref) => {});
+/// Auto-persists to SharedPreferences.
+class CollapsedTasksNotifier extends StateNotifier<Set<String>> {
+  CollapsedTasksNotifier() : super({}) {
+    _load();
+  }
+
+  static const _key = 'view_collapsed_tasks';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_key);
+    if (list != null && list.isNotEmpty) state = list.toSet();
+  }
+
+  void update(Set<String> newState) {
+    state = newState;
+    _save();
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_key, state.toList());
+  }
+}
+
+final collapsedTasksProvider = StateNotifierProvider<CollapsedTasksNotifier, Set<String>>((ref) {
+  return CollapsedTasksNotifier();
+});
 
 /// Main provider to use in UI - uses local state with stream sync
 final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
@@ -275,6 +303,42 @@ final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
 
   // Stream has data, use it
   return AsyncValue.data(streamAsync.value ?? []);
+});
+
+/// Persistence helpers for owner context
+class ViewStatePersistence {
+  static const _ownerIdKey = 'view_owner_id';
+  static const _ownerTypeKey = 'view_owner_type';
+
+  static Future<void> saveOwnerContext(OwnerContext owner) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_ownerIdKey, owner.ownerId);
+    await prefs.setString(_ownerTypeKey, owner.ownerType);
+  }
+
+  static Future<OwnerContext?> loadOwnerContext() async {
+    final prefs = await SharedPreferences.getInstance();
+    final id = prefs.getString(_ownerIdKey);
+    final type = prefs.getString(_ownerTypeKey);
+    if (id != null && type != null) {
+      return OwnerContext(ownerId: id, ownerType: type);
+    }
+    return null;
+  }
+}
+
+/// Restores persisted view state (last viewed group) on app start.
+/// Watch this in HomeScreen to trigger restoration.
+final viewStateInitProvider = FutureProvider<void>((ref) async {
+  final saved = await ViewStatePersistence.loadOwnerContext();
+  if (saved == null || saved.ownerType == 'user') return;
+
+  // Wait for groups to load and validate the saved group still exists
+  final groups = await ref.read(userGroupsProvider.future);
+  final groupExists = groups.any((g) => g.id == saved.ownerId);
+  if (groupExists) {
+    ref.read(ownerContextProvider.notifier).state = saved;
+  }
 });
 
 /// Check if current user can edit/delete a task based on group permission settings

@@ -36,10 +36,12 @@ class GroupSelector extends ConsumerWidget {
         return PopupMenuButton<String>(
           onSelected: (id) {
             final item = items.firstWhere((i) => i.id == id);
-            ref.read(ownerContextProvider.notifier).state = OwnerContext(
+            final owner = OwnerContext(
               ownerId: item.id,
               ownerType: item.type,
             );
+            ref.read(ownerContextProvider.notifier).state = owner;
+            ViewStatePersistence.saveOwnerContext(owner);
             ref.invalidate(tasksStreamProvider);
           },
           itemBuilder: (context) => items.map((item) {
