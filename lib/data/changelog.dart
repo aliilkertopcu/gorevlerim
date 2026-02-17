@@ -15,6 +15,13 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.18.3',
+    date: '2026-02-17',
+    features: [
+      '3 aşamalı basılı tutma animasyonu — 100ms eşik, kademeli büyüme (1.04x), sürükleme modunda %70 saydamlık',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.18.2',
     date: '2026-02-17',
     features: [
