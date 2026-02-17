@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -12,6 +13,7 @@ class DateNav extends ConsumerWidget {
     final selectedDate = ref.watch(selectedDateProvider);
     final dateFormat = DateFormat('d MMMM yyyy, EEEE', 'tr_TR');
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ownerColor = ref.watch(currentOwnerColorProvider);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -30,7 +32,7 @@ class DateNav extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: const Icon(Icons.chevron_left),
+            icon: Icon(Icons.chevron_left, color: ownerColor),
             onPressed: () {
               ref.read(selectedDateProvider.notifier).state =
                   selectedDate.subtract(const Duration(days: 1));
@@ -59,7 +61,7 @@ class DateNav extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: ownerColor,
                     ),
                   ),
                   if (_isToday(selectedDate))
@@ -75,7 +77,7 @@ class DateNav extends ConsumerWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.chevron_right),
+            icon: Icon(Icons.chevron_right, color: ownerColor),
             onPressed: () {
               ref.read(selectedDateProvider.notifier).state =
                   selectedDate.add(const Duration(days: 1));

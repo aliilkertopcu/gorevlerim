@@ -134,6 +134,7 @@ class TaskForm extends ConsumerWidget {
         ),
         ElevatedButton(
           onPressed: isLoading ? null : () => addTask(ctx, setDialogState),
+          style: ElevatedButton.styleFrom(backgroundColor: ref.read(currentOwnerColorProvider)),
           child: isLoading
               ? const SizedBox(
                   width: 20,
