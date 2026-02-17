@@ -42,25 +42,22 @@ class SubtaskItem extends StatelessWidget {
           child: Row(
             children: [
               // Checkbox
-              MouseRegion(
-                cursor: editable ? SystemMouseCursors.click : MouseCursor.defer,
-                child: GestureDetector(
-                  onTap: editable ? onToggle : null,
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(3),
-                      border: Border.all(
-                        color: subtask.isCompleted ? AppTheme.completedColor : Colors.grey,
-                        width: 2,
-                      ),
-                      color: subtask.isCompleted ? AppTheme.completedColor : Colors.transparent,
+              GestureDetector(
+                onTap: editable ? onToggle : null,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(
+                      color: subtask.isCompleted ? AppTheme.completedColor : Colors.grey,
+                      width: 2,
                     ),
-                    child: subtask.isCompleted
-                        ? const Icon(Icons.check, size: 12, color: Colors.white)
-                        : null,
+                    color: subtask.isCompleted ? AppTheme.completedColor : Colors.transparent,
                   ),
+                  child: subtask.isCompleted
+                      ? const Icon(Icons.check, size: 12, color: Colors.white)
+                      : null,
                 ),
               ),
               const SizedBox(width: 8),
@@ -142,12 +139,9 @@ class SubtaskItem extends StatelessWidget {
         );
 
     if (editable) {
-      return MouseRegion(
-        cursor: SystemMouseCursors.grab,
-        child: CustomDelayDragStartListener(
-          index: subtaskIndex,
-          child: inner,
-        ),
+      return CustomDelayDragStartListener(
+        index: subtaskIndex,
+        child: inner,
       );
     }
 

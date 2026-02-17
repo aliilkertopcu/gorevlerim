@@ -31,68 +31,55 @@ class TaskCard extends ConsumerWidget {
     final permissionMode = group?.settings['task_edit_permission'] as String? ?? 'allow';
     final editable = canEditTask(ref, task);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(color: statusColor, width: 4),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header row — long press to drag
-          MouseRegion(
-            cursor: SystemMouseCursors.grab,
-            child: CustomDelayDragStartListener(
-              index: index,
-              child: Padding(
+    return _PressableCard(
+      bgColor: bgColor,
+      statusColor: statusColor,
+      child: CustomDelayDragStartListener(
+        index: index,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row
+            Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 4, 6),
                 child: Row(
                   children: [
                     // Checkbox
-                    MouseRegion(
-                      cursor: editable ? SystemMouseCursors.click : MouseCursor.defer,
-                      child: GestureDetector(
-                        onTap: editable ? () => _toggleComplete(ref) : null,
-                        child: Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: task.isCompleted ? AppTheme.completedColor : Colors.grey,
-                              width: 2,
-                            ),
-                            color: task.isCompleted ? AppTheme.completedColor : Colors.transparent,
+                    GestureDetector(
+                      onTap: editable ? () => _toggleComplete(ref) : null,
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: task.isCompleted ? AppTheme.completedColor : Colors.grey,
+                            width: 2,
                           ),
-                          child: task.isCompleted
-                              ? const Icon(Icons.check, size: 16, color: Colors.white)
-                              : null,
+                          color: task.isCompleted ? AppTheme.completedColor : Colors.transparent,
                         ),
+                        child: task.isCompleted
+                            ? const Icon(Icons.check, size: 16, color: Colors.white)
+                            : null,
                       ),
                     ),
                     const SizedBox(width: 8),
                     // Title + badges (tap to expand/collapse)
                     Expanded(
-                      child: MouseRegion(
-                        cursor: hasExpandableContent ? SystemMouseCursors.click : MouseCursor.defer,
-                        child: GestureDetector(
-                          onTap: hasExpandableContent
-                              ? () {
-                                  final notifier = ref.read(collapsedTasksProvider.notifier);
-                                  final current = ref.read(collapsedTasksProvider);
-                                  if (current.contains(task.id)) {
-                                    notifier.update({...current}..remove(task.id));
-                                  } else {
-                                    notifier.update({...current, task.id});
-                                  }
+                      child: GestureDetector(
+                        onTap: hasExpandableContent
+                            ? () {
+                                final notifier = ref.read(collapsedTasksProvider.notifier);
+                                final current = ref.read(collapsedTasksProvider);
+                                if (current.contains(task.id)) {
+                                  notifier.update({...current}..remove(task.id));
+                                } else {
+                                  notifier.update({...current, task.id});
                                 }
-                              : null,
-                          behavior: HitTestBehavior.opaque,
-                      child: Row(
+                              }
+                            : null,
+                        behavior: HitTestBehavior.opaque,
+                        child: Row(
                         children: [
                           // Lock icon badge
                           if (task.locked && isGroupTask && permissionMode == 'per_task') ...[
@@ -157,7 +144,6 @@ class TaskCard extends ConsumerWidget {
                           ],
                         ],
                       ),
-                      ),
                     ),
                   ),
                   // Menu (hidden when not editable, unless lock toggle is available)
@@ -172,8 +158,6 @@ class TaskCard extends ConsumerWidget {
                 ],
                 ),
               ),
-            ),
-          ),
           // Expandable content
           if (isExpanded) ...[
             // Description
@@ -271,6 +255,7 @@ class TaskCard extends ConsumerWidget {
               ),
           ],
         ],
+      ),
       ),
     );
   }
@@ -739,6 +724,72 @@ class TaskCard extends ConsumerWidget {
       userId: user.id,
       action: action,
       details: details,
+    );
+  }
+}
+
+/// Wrapper that provides press-and-hold animation (shadow + scale)
+/// and hover effect for task cards.
+class _PressableCard extends StatefulWidget {
+  final Widget child;
+  final Color bgColor;
+  final Color statusColor;
+
+  const _PressableCard({
+    required this.child,
+    required this.bgColor,
+    required this.statusColor,
+  });
+
+  @override
+  State<_PressableCard> createState() => _PressableCardState();
+}
+
+class _PressableCardState extends State<_PressableCard> {
+  bool _isPressed = false;
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: (_) => setState(() => _isPressed = true),
+      onPointerUp: (_) => setState(() => _isPressed = false),
+      onPointerCancel: (_) => setState(() => _isPressed = false),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() {
+          _isHovered = false;
+          _isPressed = false;
+        }),
+        child: AnimatedScale(
+          scale: _isPressed ? 1.03 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              color: _isHovered
+                  ? Color.lerp(widget.bgColor, Colors.grey, 0.08)
+                  : widget.bgColor,
+              borderRadius: BorderRadius.circular(8),
+              border: Border(
+                left: BorderSide(color: widget.statusColor, width: 4),
+              ),
+              boxShadow: _isPressed
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: widget.child,
+          ),
+        ),
+      ),
     );
   }
 }

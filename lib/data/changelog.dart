@@ -15,6 +15,19 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.18.2',
+    date: '2026-02-17',
+    features: [
+      'Basılı tutma animasyonu — sürükleme başlamadan önce gölge ve hafif büyüme efekti',
+      'Swipe animasyonu — gün değiştirirken kayma ve yön okları',
+      'Hover efekti — masaüstünde görev kartına fareyle gelince hafif vurgu',
+      'Görev kartının tamamından sürükleme — sadece başlıktan değil her yerinden',
+    ],
+    fixes: [
+      'Cursor simge değişiklikleri kaldırıldı, daha doğal etkileşim',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.18.1',
     date: '2026-02-17',
     features: [

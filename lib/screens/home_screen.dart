@@ -14,11 +14,18 @@ import '../widgets/ai_setup_dialog.dart';
 import '../widgets/desktop_dialog.dart';
 import '../version.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  double _dragOffset = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final tasksAsync = ref.watch(tasksProvider);
     final currentTheme = ref.watch(themeNotifierProvider);
     final ownerColor = ref.watch(currentOwnerColorProvider);
@@ -29,30 +36,71 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       body: SafeArea(
         child: GestureDetector(
+          onHorizontalDragUpdate: (details) {
+            setState(() {
+              _dragOffset += details.delta.dx;
+              _dragOffset = _dragOffset.clamp(-60.0, 60.0);
+            });
+          },
           onHorizontalDragEnd: (details) {
             // Swipe threshold
-            if (details.primaryVelocity == null) return;
-            if (details.primaryVelocity!.abs() < 300) return;
-
-            final currentDate = ref.read(selectedDateProvider);
-            if (details.primaryVelocity! > 0) {
-              // Swipe right → previous day
-              ref.read(selectedDateProvider.notifier).state =
-                  currentDate.subtract(const Duration(days: 1));
-            } else {
-              // Swipe left → next day
-              ref.read(selectedDateProvider.notifier).state =
-                  currentDate.add(const Duration(days: 1));
+            if (details.primaryVelocity != null && details.primaryVelocity!.abs() > 300) {
+              final currentDate = ref.read(selectedDateProvider);
+              if (details.primaryVelocity! > 0) {
+                // Swipe right → previous day
+                ref.read(selectedDateProvider.notifier).state =
+                    currentDate.subtract(const Duration(days: 1));
+              } else {
+                // Swipe left → next day
+                ref.read(selectedDateProvider.notifier).state =
+                    currentDate.add(const Duration(days: 1));
+              }
             }
+            setState(() => _dragOffset = 0);
           },
-          child: RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(tasksStreamProvider);
-              try {
-                await ref.read(tasksStreamProvider.future);
-              } catch (_) {}
-            },
-            child: CustomScrollView(
+          onHorizontalDragCancel: () {
+            setState(() => _dragOffset = 0);
+          },
+          child: Stack(
+            children: [
+              // Swipe direction indicators
+              if (_dragOffset > 15)
+                Positioned(
+                  left: 8,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Opacity(
+                      opacity: ((_dragOffset - 15) / 45).clamp(0.0, 1.0),
+                      child: Icon(Icons.chevron_left, size: 28, color: ownerColor.withValues(alpha: 0.6)),
+                    ),
+                  ),
+                ),
+              if (_dragOffset < -15)
+                Positioned(
+                  right: 8,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Opacity(
+                      opacity: ((-_dragOffset - 15) / 45).clamp(0.0, 1.0),
+                      child: Icon(Icons.chevron_right, size: 28, color: ownerColor.withValues(alpha: 0.6)),
+                    ),
+                  ),
+                ),
+              // Main content with drag offset
+              AnimatedSlide(
+                offset: Offset(_dragOffset / MediaQuery.of(context).size.width, 0),
+                duration: _dragOffset == 0 ? const Duration(milliseconds: 200) : Duration.zero,
+                curve: Curves.easeOutCubic,
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(tasksStreamProvider);
+                    try {
+                      await ref.read(tasksStreamProvider.future);
+                    } catch (_) {}
+                  },
+                  child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
@@ -102,7 +150,7 @@ class HomeScreen extends ConsumerWidget {
                                   PopupMenuButton<String>(
                                     icon: const Icon(Icons.more_vert, color: Colors.white),
                                     tooltip: 'Menü',
-                                    onSelected: (value) => _onMenuAction(context, ref, value),
+                                    onSelected: (value) => _onMenuAction(context, value),
                                     itemBuilder: (context) => [
                                       const PopupMenuItem(
                                         value: 'ai',
@@ -338,12 +386,15 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
           ),
+          ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _onMenuAction(BuildContext context, WidgetRef ref, String action) {
+  void _onMenuAction(BuildContext context, String action) {
     switch (action) {
       case 'ai':
         showDialog(
@@ -358,13 +409,13 @@ class HomeScreen extends ConsumerWidget {
       case 'onboarding':
         GoRouter.of(context).push('/onboarding');
       case 'theme':
-        _showThemeDialog(context, ref);
+        _showThemeDialog(context);
       case 'logout':
         ref.read(authServiceProvider).signOut();
     }
   }
 
-  void _showThemeDialog(BuildContext context, WidgetRef ref) {
+  void _showThemeDialog(BuildContext context) {
     final currentTheme = ref.read(themeNotifierProvider);
 
     showAppDialog(
@@ -374,21 +425,21 @@ class HomeScreen extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildThemeOption(
-            context, ref,
+            context,
             AppThemeMode.light,
             'Açık',
             Icons.light_mode,
             currentTheme,
           ),
           _buildThemeOption(
-            context, ref,
+            context,
             AppThemeMode.dark,
             'Koyu',
             Icons.dark_mode,
             currentTheme,
           ),
           _buildThemeOption(
-            context, ref,
+            context,
             AppThemeMode.system,
             'Otomatik',
             Icons.brightness_auto,
@@ -402,7 +453,6 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildThemeOption(
     BuildContext context,
-    WidgetRef ref,
     AppThemeMode mode,
     String label,
     IconData icon,
