@@ -118,7 +118,7 @@ class HomeScreen extends ConsumerWidget {
                                           children: [
                                             Icon(Icons.group),
                                             SizedBox(width: 12),
-                                            Text('Grup Yönetimi'),
+                                            Text('Gruplar'),
                                           ],
                                         ),
                                       ),

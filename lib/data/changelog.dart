@@ -15,6 +15,23 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.18.0',
+    date: '2026-02-17',
+    features: [
+      'Görev düzenleme izin sistemi — Herkes / Sadece sahibi / Görev bazlı kilit',
+      'Grup kurucusu tüm izin kısıtlamalarını bypass eder',
+      'Gelişmiş aktivite günlüğü — tüm görev, alt görev ve üye hareketleri loglanıyor',
+      'Aktivite günlüğünde sonsuz scroll (infinite scroll)',
+      'Bağlantıyla gruba davet sistemi — süre sınırlı davet linkleri',
+      'Davet önizleme sayfası — grup bilgisi ve katılma butonu',
+      'Davet bağlantısı yönetimi — oluşturma, silme, kopyalama',
+      'Menüde "Gruplar" olarak yeniden adlandırıldı',
+    ],
+    fixes: [
+      'Onboarding geri butonu direkt linkle açıldığında login sayfasına yönlendiriyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.17.0',
     date: '2026-02-17',
     features: [

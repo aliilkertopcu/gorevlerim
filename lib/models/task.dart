@@ -88,6 +88,7 @@ class Task {
   final String? blockReason;
   final DateTime? postponedTo;
   final int sortOrder;
+  final bool locked;
   final String? createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -104,6 +105,7 @@ class Task {
     this.blockReason,
     this.postponedTo,
     this.sortOrder = 0,
+    this.locked = false,
     this.createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -132,6 +134,7 @@ class Task {
     String? blockReason,
     DateTime? postponedTo,
     int? sortOrder,
+    bool? locked,
     String? createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -148,6 +151,7 @@ class Task {
       blockReason: blockReason ?? this.blockReason,
       postponedTo: postponedTo ?? this.postponedTo,
       sortOrder: sortOrder ?? this.sortOrder,
+      locked: locked ?? this.locked,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -169,6 +173,7 @@ class Task {
           ? DateTime.parse(json['postponed_to'] as String)
           : null,
       sortOrder: json['sort_order'] as int? ?? 0,
+      locked: json['locked'] as bool? ?? false,
       createdBy: json['created_by'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
@@ -194,6 +199,7 @@ class Task {
           ? '${postponedTo!.year}-${postponedTo!.month.toString().padLeft(2, '0')}-${postponedTo!.day.toString().padLeft(2, '0')}'
           : null,
       'sort_order': sortOrder,
+      'locked': locked,
       'created_by': createdBy,
     };
   }
