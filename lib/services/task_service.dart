@@ -351,6 +351,11 @@ class TaskService {
       'sort_order': nextOrder,
     }).select().single();
 
+    // Touch parent task to trigger realtime stream update
+    await _client.from('tasks')
+        .update({'updated_at': DateTime.now().toIso8601String()})
+        .eq('id', taskId);
+
     return Subtask.fromJson(data);
   }
 

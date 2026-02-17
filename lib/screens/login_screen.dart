@@ -101,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Yapılacaklar',
+                  'Görevlerim',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,

@@ -3,172 +3,146 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/task_provider.dart';
 import '../providers/auth_provider.dart';
-import '../theme/app_theme.dart';
+import '../providers/group_provider.dart';
+import 'desktop_dialog.dart';
 
-class TaskForm extends ConsumerStatefulWidget {
+class TaskForm extends ConsumerWidget {
   const TaskForm({super.key});
 
   @override
-  ConsumerState<TaskForm> createState() => _TaskFormState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ownerColor = ref.watch(currentOwnerColorProvider);
 
-class _TaskFormState extends ConsumerState<TaskForm> {
-  final _titleController = TextEditingController();
-  final _descController = TextEditingController();
-  bool _isExpanded = false;
-  bool _isLoading = false;
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descController.dispose();
-    super.dispose();
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => _showAddTaskDialog(context, ref),
+        icon: const Icon(Icons.add),
+        label: const Text('Yeni Görev Ekle'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: ownerColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
   }
 
-  Future<void> _addTask() async {
-    final title = _titleController.text.trim();
-    if (title.isEmpty) return;
+  void _showAddTaskDialog(BuildContext context, WidgetRef ref) {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    final descFocusNode = FocusNode();
+    var isLoading = false;
 
-    final description = _descController.text.trim();
-    final owner = ref.read(ownerContextProvider);
-    final user = ref.read(currentUserProvider);
-    final date = ref.read(selectedDateProvider);
+    void addTask(BuildContext dialogContext, StateSetter setDialogState) async {
+      final title = titleController.text.trim();
+      if (title.isEmpty) return;
 
-    if (owner == null || user == null) return;
+      final description = descController.text.trim();
+      final owner = ref.read(ownerContextProvider);
+      final user = ref.read(currentUserProvider);
+      final date = ref.read(selectedDateProvider);
 
-    setState(() => _isLoading = true);
+      if (owner == null || user == null) return;
 
-    try {
-      // Parse subtasks from description lines starting with "* "
-      final lines = description.split('\n');
-      final subtaskTitles = <String>[];
-      final descLines = <String>[];
+      setDialogState(() => isLoading = true);
 
-      for (final line in lines) {
-        if (line.trimLeft().startsWith('* ')) {
-          subtaskTitles.add(line.trimLeft().substring(2).trim());
-        } else {
-          descLines.add(line);
+      try {
+        final lines = description.split('\n');
+        final subtaskTitles = <String>[];
+        final descLines = <String>[];
+
+        for (final line in lines) {
+          if (line.trimLeft().startsWith('* ')) {
+            subtaskTitles.add(line.trimLeft().substring(2).trim());
+          } else {
+            descLines.add(line);
+          }
+        }
+
+        final cleanDesc = descLines.join('\n').trim();
+
+        await ref.read(taskServiceProvider).createTask(
+          ownerId: owner.ownerId,
+          ownerType: owner.ownerType,
+          date: date,
+          title: title,
+          description: cleanDesc.isEmpty ? null : cleanDesc,
+          createdBy: user.id,
+          subtaskTitles: subtaskTitles,
+        );
+
+        ref.invalidate(tasksStreamProvider);
+
+        if (dialogContext.mounted) {
+          Navigator.pop(dialogContext);
+        }
+      } catch (e) {
+        if (dialogContext.mounted) {
+          ScaffoldMessenger.of(dialogContext).showSnackBar(
+            SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+          );
+          setDialogState(() => isLoading = false);
         }
       }
-
-      final cleanDesc = descLines.join('\n').trim();
-
-      await ref.read(taskServiceProvider).createTask(
-        ownerId: owner.ownerId,
-        ownerType: owner.ownerType,
-        date: date,
-        title: title,
-        description: cleanDesc.isEmpty ? null : cleanDesc,
-        createdBy: user.id,
-        subtaskTitles: subtaskTitles,
-      );
-
-      _titleController.clear();
-      _descController.clear();
-      setState(() => _isExpanded = false);
-
-      // Refresh tasks (stream will auto-sync, but invalidate to be sure)
-      ref.invalidate(tasksStreamProvider);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () => setState(() => _isExpanded = !_isExpanded),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Icon(
-                    _isExpanded ? Icons.expand_less : Icons.add_circle_outline,
-                    color: AppTheme.primaryColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Yeni Görev Ekle',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                ],
+    showAppDialog(
+      context: context,
+      title: const Text('Yeni Görev'),
+      contentBuilder: (ctx, setDialogState) => KeyboardListener(
+        focusNode: FocusNode(),
+        onKeyEvent: (event) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.enter &&
+              HardwareKeyboard.instance.isControlPressed) {
+            addTask(ctx, setDialogState);
+          }
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(
+                hintText: 'Görev başlığı',
               ),
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              onSubmitted: (_) => descFocusNode.requestFocus(),
             ),
-          ),
-          if (_isExpanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _titleController,
-                    decoration: const InputDecoration(
-                      hintText: 'Görev başlığı',
-                    ),
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) {
-                      if (_descController.text.isEmpty) {
-                        _addTask();
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  KeyboardListener(
-                    focusNode: FocusNode(),
-                    onKeyEvent: (event) {
-                      if (event is KeyDownEvent &&
-                          event.logicalKey == LogicalKeyboardKey.enter &&
-                          HardwareKeyboard.instance.isControlPressed) {
-                        _addTask();
-                      }
-                    },
-                    child: TextField(
-                      controller: _descController,
-                      decoration: const InputDecoration(
-                        hintText: 'Açıklama (opsiyonel)\n* ile alt görev ekle\nCtrl+Enter ile ekle',
-                      ),
-                      maxLines: 4,
-                      minLines: 2,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _addTask,
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('Ekle'),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 8),
+            TextField(
+              controller: descController,
+              focusNode: descFocusNode,
+              decoration: const InputDecoration(
+                hintText: 'Açıklama (opsiyonel)\n* ile alt görev ekle\nCtrl+Enter ile ekle',
               ),
+              maxLines: 4,
+              minLines: 2,
             ),
-        ],
+          ],
+        ),
       ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('İptal'),
+        ),
+        ElevatedButton(
+          onPressed: isLoading ? null : () => addTask(ctx, setDialogState),
+          child: isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Ekle'),
+        ),
+      ],
     );
   }
 }

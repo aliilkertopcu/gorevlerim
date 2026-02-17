@@ -232,6 +232,9 @@ final tasksStreamProvider = StreamProvider.autoDispose<List<Task>>((ref) {
   });
 });
 
+/// Tracks which tasks are collapsed. Empty set = all expanded (default).
+final collapsedTasksProvider = StateProvider<Set<String>>((ref) => {});
+
 /// Main provider to use in UI - uses local state with stream sync
 final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
   // Subscribe to stream to trigger updates
