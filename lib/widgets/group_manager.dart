@@ -1056,7 +1056,8 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
         ? DateTime.tryParse(invite['expires_at'] as String)
         : null;
     final isExpired = expiresAt != null && expiresAt.isBefore(DateTime.now());
-    final inviteUrl = '${Uri.base.origin}/#/invite/$token';
+    final base = Uri.base.toString().replaceAll(RegExp(r'#.*$'), '');
+    final inviteUrl = '${base}#/invite/$token';
 
     String expiryText;
     if (expiresAt == null) {
