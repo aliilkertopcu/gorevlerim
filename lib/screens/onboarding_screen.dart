@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../data/changelog.dart';
 import '../version.dart';
 import '../widgets/youtube_embed.dart';
@@ -40,7 +41,13 @@ class OnboardingScreen extends StatelessWidget {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        } else {
+                          GoRouter.of(context).go('/login');
+                        }
+                      },
                     ),
                     const Expanded(
                       child: Text(

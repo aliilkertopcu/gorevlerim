@@ -77,6 +77,16 @@ class TaskForm extends ConsumerWidget {
 
         ref.invalidate(tasksStreamProvider);
 
+        // Log if group task
+        if (owner.ownerType == 'group') {
+          ref.read(groupServiceProvider).logActivity(
+            groupId: owner.ownerId,
+            userId: user.id,
+            action: 'task_created',
+            details: '"$title"',
+          );
+        }
+
         if (dialogContext.mounted) {
           Navigator.pop(dialogContext);
         }

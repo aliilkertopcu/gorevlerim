@@ -233,6 +233,11 @@ class TaskService {
     });
   }
 
+  /// Toggle task lock
+  Future<void> toggleTaskLock(String taskId, bool currentlyLocked) async {
+    await updateTask(taskId, {'locked': !currentlyLocked});
+  }
+
   /// Soft delete a task (marks as deleted instead of removing)
   Future<void> deleteTask(String taskId) async {
     await updateTask(taskId, {'status': 'deleted'});

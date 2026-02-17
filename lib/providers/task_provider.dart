@@ -4,6 +4,7 @@ import 'package:riverpod/legacy.dart';
 import '../models/task.dart';
 import '../services/task_service.dart';
 import 'auth_provider.dart';
+import 'group_provider.dart';
 
 final taskServiceProvider = Provider<TaskService>((ref) {
   return TaskService(ref.watch(supabaseProvider));
@@ -189,6 +190,17 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     state = tasks;
   }
 
+  /// Optimistic toggle lock
+  void optimisticToggleLock(String taskId) {
+    _markOptimisticUpdate();
+    state = state.map((task) {
+      if (task.id == taskId) {
+        return task.copyWith(locked: !task.locked);
+      }
+      return task;
+    }).toList();
+  }
+
   /// Optimistic reorder subtasks
   void optimisticReorderSubtasks(String taskId, int oldIndex, int newIndex) {
     _markOptimisticUpdate();
@@ -264,3 +276,34 @@ final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
   // Stream has data, use it
   return AsyncValue.data(streamAsync.value ?? []);
 });
+
+/// Check if current user can edit/delete a task based on group permission settings
+bool canEditTask(WidgetRef ref, Task task) {
+  final user = ref.read(currentUserProvider);
+  if (user == null) return false;
+
+  // Personal tasks — always editable
+  final owner = ref.read(ownerContextProvider);
+  if (owner == null || owner.ownerType == 'user') return true;
+
+  // Group context
+  final group = ref.read(currentGroupProvider);
+  if (group == null) return true;
+
+  // Group creator bypasses all restrictions
+  if (group.createdBy == user.id) return true;
+
+  final permission = group.settings['task_edit_permission'] as String? ?? 'allow';
+
+  switch (permission) {
+    case 'allow':
+      return true;
+    case 'deny':
+      return task.createdBy == user.id;
+    case 'per_task':
+      if (task.locked && task.createdBy != user.id) return false;
+      return true;
+    default:
+      return true;
+  }
+}

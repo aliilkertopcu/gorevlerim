@@ -19,6 +19,20 @@ final userGroupsProvider = FutureProvider.autoDispose<List<Group>>((ref) async {
   return groupService.fetchUserGroups(user.id);
 });
 
+/// Provides the currently selected group (null if user's personal tasks)
+final currentGroupProvider = Provider<Group?>((ref) {
+  final owner = ref.watch(ownerContextProvider);
+  final groupsAsync = ref.watch(userGroupsProvider);
+
+  if (owner == null || owner.ownerType == 'user') return null;
+
+  return groupsAsync.when(
+    data: (groups) => groups.where((g) => g.id == owner.ownerId).firstOrNull,
+    loading: () => null,
+    error: (_, _) => null,
+  );
+});
+
 /// Provides the color for the currently selected owner (user or group)
 final currentOwnerColorProvider = Provider<Color>((ref) {
   final owner = ref.watch(ownerContextProvider);
@@ -39,4 +53,16 @@ final currentOwnerColorProvider = Provider<Color>((ref) {
     loading: () => AppTheme.primaryColor,
     error: (_, _) => AppTheme.primaryColor,
   );
+});
+
+/// Provides invites for a group
+final groupInvitesProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, groupId) async {
+  final groupService = ref.watch(groupServiceProvider);
+  return groupService.getGroupInvites(groupId);
+});
+
+/// Provides invite data by token (for invite preview page)
+final inviteByTokenProvider = FutureProvider.autoDispose.family<Map<String, dynamic>?, String>((ref, token) async {
+  final groupService = ref.watch(groupServiceProvider);
+  return groupService.getInviteByToken(token);
 });

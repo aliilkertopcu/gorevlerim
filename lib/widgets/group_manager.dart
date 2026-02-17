@@ -312,18 +312,24 @@ class _GroupDetailView extends ConsumerStatefulWidget {
 
 class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
   List<Map<String, dynamic>>? _members;
-  List<Map<String, dynamic>>? _activityLog;
+  List<Map<String, dynamic>> _activityLog = [];
+  List<Map<String, dynamic>>? _invites;
   bool _isLoadingMembers = true;
   bool _isLoadingLog = false;
+  bool _isLoadingMoreLog = false;
+  bool _hasMoreLog = true;
   bool _isLoading = false;
+  bool _isLoadingInvites = false;
   late String _currentColor;
   late String _currentName;
   late String _currentDescription;
   bool _isEditingName = false;
   bool _isEditingDescription = false;
   bool _showActivityLog = false;
+  bool _showInvites = false;
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
+  final ScrollController _logScrollController = ScrollController();
 
   @override
   void initState() {
@@ -334,13 +340,24 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
     _nameController = TextEditingController(text: _currentName);
     _descriptionController = TextEditingController(text: _currentDescription);
     _loadMembers();
+    _logScrollController.addListener(_onLogScroll);
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _logScrollController.dispose();
     super.dispose();
+  }
+
+  void _onLogScroll() {
+    if (_logScrollController.position.pixels >=
+            _logScrollController.position.maxScrollExtent - 50 &&
+        !_isLoadingMoreLog &&
+        _hasMoreLog) {
+      _loadMoreActivityLog();
+    }
   }
 
   Future<void> _loadMembers() async {
@@ -360,18 +377,67 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
   }
 
   Future<void> _loadActivityLog() async {
-    setState(() => _isLoadingLog = true);
+    setState(() {
+      _isLoadingLog = true;
+      _activityLog = [];
+      _hasMoreLog = true;
+    });
     try {
-      final logs = await ref.read(groupServiceProvider).getActivityLog(widget.group.id);
+      final logs = await ref.read(groupServiceProvider).getActivityLog(
+        widget.group.id,
+        limit: 20,
+        offset: 0,
+      );
       if (mounted) {
         setState(() {
           _activityLog = logs;
           _isLoadingLog = false;
+          _hasMoreLog = logs.length >= 20;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingLog = false);
+      }
+    }
+  }
+
+  Future<void> _loadMoreActivityLog() async {
+    if (_isLoadingMoreLog || !_hasMoreLog) return;
+    setState(() => _isLoadingMoreLog = true);
+    try {
+      final logs = await ref.read(groupServiceProvider).getActivityLog(
+        widget.group.id,
+        limit: 20,
+        offset: _activityLog.length,
+      );
+      if (mounted) {
+        setState(() {
+          _activityLog.addAll(logs);
+          _isLoadingMoreLog = false;
+          _hasMoreLog = logs.length >= 20;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMoreLog = false);
+      }
+    }
+  }
+
+  Future<void> _loadInvites() async {
+    setState(() => _isLoadingInvites = true);
+    try {
+      final invites = await ref.read(groupServiceProvider).getGroupInvites(widget.group.id);
+      if (mounted) {
+        setState(() {
+          _invites = invites;
+          _isLoadingInvites = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingInvites = false);
       }
     }
   }
@@ -495,6 +561,11 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
                     // Settings section (creator only)
                     if (_isCreator) ...[
                       _buildSettingsSection(),
+                      const SizedBox(height: 16),
+                    ],
+                    // Invite links (creator only)
+                    if (_isCreator) ...[
+                      _buildInviteLinksSection(),
                       const SizedBox(height: 16),
                     ],
                     // Activity log
@@ -820,6 +891,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
 
   Widget _buildSettingsSection() {
     final logVisibility = widget.group.settings['activity_log_visibility'] as String? ?? 'creator_only';
+    final taskEditPermission = widget.group.settings['task_edit_permission'] as String? ?? 'allow';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -830,6 +902,41 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
             fontWeight: FontWeight.w600,
             fontSize: 14,
             color: Theme.of(context).hintColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Task edit permission setting
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).hintColor.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.edit_note, size: 18, color: Theme.of(context).hintColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Görev düzenleme',
+                  style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
+                ),
+              ),
+              DropdownButton<String>(
+                value: taskEditPermission,
+                underline: const SizedBox(),
+                isDense: true,
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface),
+                items: const [
+                  DropdownMenuItem(value: 'allow', child: Text('Herkes')),
+                  DropdownMenuItem(value: 'deny', child: Text('Sadece sahibi')),
+                  DropdownMenuItem(value: 'per_task', child: Text('Görev bazlı')),
+                ],
+                onChanged: (value) {
+                  if (value != null) _updateTaskEditPermission(value);
+                },
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -867,6 +974,164 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildInviteLinksSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () {
+            if (!_showInvites) {
+              _loadInvites();
+            }
+            setState(() => _showInvites = !_showInvites);
+          },
+          child: Row(
+            children: [
+              Text(
+                'Davet Bağlantıları',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: Theme.of(context).hintColor,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                _showInvites ? Icons.expand_less : Icons.expand_more,
+                size: 20,
+                color: Theme.of(context).hintColor,
+              ),
+            ],
+          ),
+        ),
+        if (_showInvites) ...[
+          const SizedBox(height: 8),
+          // Create new invite button
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _showCreateInviteDialog,
+              icon: const Icon(Icons.add_link, size: 18),
+              label: const Text('Yeni Davet Oluştur'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _parseColor(_currentColor),
+                side: BorderSide(color: _parseColor(_currentColor).withValues(alpha: 0.5)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_isLoadingInvites)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (_invites == null || _invites!.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).hintColor.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Henüz davet bağlantısı yok',
+                style: TextStyle(fontSize: 13, color: Theme.of(context).hintColor),
+              ),
+            )
+          else
+            ...(_invites!.map((invite) => _buildInviteTile(invite))),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildInviteTile(Map<String, dynamic> invite) {
+    final token = invite['token'] as String;
+    final expiresAt = invite['expires_at'] != null
+        ? DateTime.tryParse(invite['expires_at'] as String)
+        : null;
+    final isExpired = expiresAt != null && expiresAt.isBefore(DateTime.now());
+    final inviteUrl = '${Uri.base.origin}/#/invite/$token';
+
+    String expiryText;
+    if (expiresAt == null) {
+      expiryText = 'Süresiz';
+    } else if (isExpired) {
+      expiryText = 'Süresi dolmuş';
+    } else {
+      final diff = expiresAt.difference(DateTime.now());
+      if (diff.inDays > 0) {
+        expiryText = '${diff.inDays} gün kaldı';
+      } else if (diff.inHours > 0) {
+        expiryText = '${diff.inHours} saat kaldı';
+      } else {
+        expiryText = '${diff.inMinutes} dk kaldı';
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).hintColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: isExpired
+            ? Border.all(color: Colors.red.withValues(alpha: 0.3))
+            : null,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isExpired ? Icons.link_off : Icons.link,
+            size: 16,
+            color: isExpired ? Colors.red[400] : _parseColor(_currentColor),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '...${token.substring(token.length - 8)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    color: isExpired ? Colors.red[400] : null,
+                  ),
+                ),
+                Text(
+                  expiryText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isExpired ? Colors.red[400] : Theme.of(context).hintColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!isExpired)
+            IconButton(
+              icon: const Icon(Icons.copy, size: 16),
+              tooltip: 'Bağlantıyı kopyala',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: inviteUrl));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Davet bağlantısı kopyalandı')),
+                );
+              },
+            ),
+          IconButton(
+            icon: Icon(Icons.delete_outline, size: 16, color: Colors.red[400]),
+            tooltip: 'Daveti sil',
+            onPressed: () => _deleteInvite(invite['id'] as String),
+          ),
+        ],
+      ),
     );
   }
 
@@ -909,7 +1174,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             )
-          else if (_activityLog == null || _activityLog!.isEmpty)
+          else if (_activityLog.isEmpty)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -924,21 +1189,28 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
             )
           else
             Container(
-              constraints: const BoxConstraints(maxHeight: 200),
+              constraints: const BoxConstraints(maxHeight: 250),
               decoration: BoxDecoration(
                 color: Theme.of(context).hintColor.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ListView.separated(
+                controller: _logScrollController,
                 shrinkWrap: true,
                 padding: const EdgeInsets.all(8),
-                itemCount: _activityLog!.length,
+                itemCount: _activityLog.length + (_isLoadingMoreLog ? 1 : 0),
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (context, index) {
-                  final log = _activityLog![index];
+                  if (index >= _activityLog.length) {
+                    return const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    );
+                  }
+                  final log = _activityLog[index];
                   final profiles = log['profiles'] as Map<String, dynamic>?;
                   final name = profiles?['display_name'] as String? ?? '?';
-                  final action = log['action'] as String? ?? '';
+                  final action = _localizeAction(log['action'] as String? ?? '');
                   final details = log['details'] as String?;
                   final createdAt = DateTime.tryParse(log['created_at'] as String? ?? '');
                   final timeStr = createdAt != null
@@ -992,6 +1264,37 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
     );
   }
 
+  String _localizeAction(String action) {
+    switch (action) {
+      case 'member_joined': return 'gruba katıldı';
+      case 'member_left': return 'gruptan ayrıldı';
+      case 'member_removed': return 'üyeyi çıkardı';
+      case 'task_created': return 'görev oluşturdu';
+      case 'task_deleted': return 'görevi sildi';
+      case 'task_edited': return 'görevi düzenledi';
+      case 'task_completed': return 'görevi tamamladı';
+      case 'task_uncompleted': return 'görevi geri aldı';
+      case 'task_blocked': return 'görevi bloke etti';
+      case 'task_unblocked': return 'blokeyi kaldırdı';
+      case 'task_postponed': return 'görevi erteledi';
+      case 'task_locked': return 'görevi kilitledi';
+      case 'task_unlocked': return 'kilidini açtı';
+      case 'subtask_completed': return 'alt görevi tamamladı';
+      case 'subtask_uncompleted': return 'alt görevi geri aldı';
+      case 'subtask_deleted': return 'alt görevi sildi';
+      case 'subtask_blocked': return 'alt görevi bloke etti';
+      case 'subtask_edited': return 'alt görevi düzenledi';
+      case 'subtask_promoted': return 'alt görevi ana görev yaptı';
+      case 'group_name_changed': return 'grup adını değiştirdi';
+      case 'group_color_changed': return 'grup rengini değiştirdi';
+      case 'group_description_changed': return 'açıklamayı güncelledi';
+      case 'settings_changed': return 'ayarları güncelledi';
+      case 'invite_created': return 'davet oluşturdu';
+      case 'invite_deleted': return 'daveti sildi';
+      default: return action;
+    }
+  }
+
   Widget _buildActionButtons() {
     if (_isCreator) {
       return SizedBox(
@@ -1028,6 +1331,17 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
 
   // ─── Actions ───────────────────────────────
 
+  void _logActivity(String action, {String? details}) {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+    ref.read(groupServiceProvider).logActivity(
+      groupId: widget.group.id,
+      userId: user.id,
+      action: action,
+      details: details,
+    );
+  }
+
   Future<void> _saveName() async {
     final newName = _nameController.text.trim();
     if (newName.isEmpty || newName == _currentName) {
@@ -1045,6 +1359,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
         groupId: widget.group.id,
         name: newName,
       );
+      _logActivity('group_name_changed', details: '"$newName"');
       widget.onGroupUpdated(widget.group.copyWith(name: newName));
     } catch (e) {
       if (mounted) {
@@ -1069,6 +1384,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
         groupId: widget.group.id,
         description: newDesc.isEmpty ? null : newDesc,
       );
+      _logActivity('group_description_changed');
       widget.onGroupUpdated(widget.group.copyWith(description: newDesc));
     } catch (e) {
       if (mounted) {
@@ -1088,12 +1404,31 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
         groupId: widget.group.id,
         color: hex,
       );
+      _logActivity('group_color_changed');
       widget.onGroupUpdated(widget.group.copyWith(color: hex));
     } catch (e) {
       if (mounted) {
         setState(() => _currentColor = widget.group.color);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Renk değiştirilemedi: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateTaskEditPermission(String permission) async {
+    final newSettings = {...widget.group.settings, 'task_edit_permission': permission};
+    try {
+      await ref.read(groupServiceProvider).updateGroupSettings(
+        groupId: widget.group.id,
+        settings: newSettings,
+      );
+      _logActivity('settings_changed', details: 'Görev düzenleme: $permission');
+      widget.onGroupUpdated(widget.group.copyWith(settings: newSettings));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ayar güncellenemedi: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -1106,11 +1441,112 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
         groupId: widget.group.id,
         settings: newSettings,
       );
+      _logActivity('settings_changed', details: 'Geçmiş logu: $visibility');
       widget.onGroupUpdated(widget.group.copyWith(settings: newSettings));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ayar güncellenemedi: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _showCreateInviteDialog() {
+    String? selectedDuration = '7d';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Yeni Davet Oluştur'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Geçerlilik süresi:'),
+              const SizedBox(height: 12),
+              ...['1d', '7d', '30d', 'unlimited'].map((option) {
+                final label = switch (option) {
+                  '1d' => '1 Gün',
+                  '7d' => '7 Gün',
+                  '30d' => '30 Gün',
+                  'unlimited' => 'Süresiz',
+                  _ => option,
+                };
+                return RadioListTile<String>(
+                  title: Text(label),
+                  value: option,
+                  groupValue: selectedDuration,
+                  dense: true,
+                  onChanged: (v) => setDialogState(() => selectedDuration = v),
+                );
+              }),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _createInvite(selectedDuration);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: _parseColor(_currentColor)),
+              child: const Text('Oluştur'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createInvite(String? duration) async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    Duration? expiresIn;
+    if (duration == '1d') expiresIn = const Duration(days: 1);
+    if (duration == '7d') expiresIn = const Duration(days: 7);
+    if (duration == '30d') expiresIn = const Duration(days: 30);
+
+    try {
+      await ref.read(groupServiceProvider).createInvite(
+        groupId: widget.group.id,
+        createdBy: user.id,
+        expiresIn: expiresIn,
+      );
+      _loadInvites();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Davet bağlantısı oluşturuldu')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteInvite(String inviteId) async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    try {
+      await ref.read(groupServiceProvider).deleteInvite(
+        inviteId,
+        groupId: widget.group.id,
+        userId: user.id,
+      );
+      _loadInvites();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -1137,11 +1573,15 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
 
     if (confirmed != true) return;
 
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+
     setState(() => _isLoading = true);
     try {
       await ref.read(groupServiceProvider).removeMember(
         groupId: widget.group.id,
         userId: userId,
+        removedByUserId: currentUser.id,
       );
       await _loadMembers();
       if (mounted) {

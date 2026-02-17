@@ -26,6 +26,9 @@ class TaskCard extends ConsumerWidget {
     final hasExpandableContent = task.subtasks.isNotEmpty ||
         (task.description != null && task.description!.isNotEmpty) ||
         (task.isBlocked && task.blockReason != null);
+    final isGroupTask = ref.watch(ownerContextProvider)?.ownerType == 'group';
+    final group = ref.watch(currentGroupProvider);
+    final permissionMode = group?.settings['task_edit_permission'] as String? ?? 'allow';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
@@ -90,6 +93,11 @@ class TaskCard extends ConsumerWidget {
                           behavior: HitTestBehavior.opaque,
                       child: Row(
                         children: [
+                          // Lock icon badge
+                          if (task.locked && isGroupTask && permissionMode == 'per_task') ...[
+                            Icon(Icons.lock, size: 14, color: Colors.orange[700]),
+                            const SizedBox(width: 4),
+                          ],
                           Flexible(
                             child: Text(
                               task.title,
@@ -154,19 +162,7 @@ class TaskCard extends ConsumerWidget {
                   // Menu
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                      PopupMenuItem(
-                        value: task.isBlocked ? 'unblock' : 'block',
-                        child: Text(task.isBlocked ? 'Blokeyi Kaldır' : 'Bloke Et'),
-                      ),
-                      const PopupMenuItem(value: 'postpone', child: Text('Ertele')),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Sil', style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
+                    itemBuilder: (context) => _buildMenuItems(ref),
                     onSelected: (value) => _onMenuAction(context, ref, value),
                   ),
                 ],
@@ -256,9 +252,64 @@ class TaskCard extends ConsumerWidget {
     );
   }
 
+  List<PopupMenuEntry<String>> _buildMenuItems(WidgetRef ref) {
+    final editable = canEditTask(ref, task);
+    final isGroupTask = ref.read(ownerContextProvider)?.ownerType == 'group';
+    final group = ref.read(currentGroupProvider);
+    final user = ref.read(currentUserProvider);
+    final permissionMode = group?.settings['task_edit_permission'] as String? ?? 'allow';
+    final isCreator = group != null && user != null && group.createdBy == user.id;
+    final isTaskOwner = user != null && task.createdBy == user.id;
+    final showLockToggle = isGroupTask && permissionMode == 'per_task' && (isTaskOwner || isCreator);
+
+    final items = <PopupMenuEntry<String>>[];
+
+    if (editable) {
+      items.add(const PopupMenuItem(value: 'edit', child: Text('Düzenle')));
+      items.add(PopupMenuItem(
+        value: task.isBlocked ? 'unblock' : 'block',
+        child: Text(task.isBlocked ? 'Blokeyi Kaldır' : 'Bloke Et'),
+      ));
+      items.add(const PopupMenuItem(value: 'postpone', child: Text('Ertele')));
+    }
+
+    if (showLockToggle) {
+      if (items.isNotEmpty) items.add(const PopupMenuDivider());
+      items.add(PopupMenuItem(
+        value: 'toggle_lock',
+        child: Row(
+          children: [
+            Icon(task.locked ? Icons.lock_open : Icons.lock, size: 18),
+            const SizedBox(width: 8),
+            Text(task.locked ? 'Kilidi Aç' : 'Kilitle'),
+          ],
+        ),
+      ));
+    }
+
+    if (editable) {
+      items.add(const PopupMenuDivider());
+      items.add(const PopupMenuItem(
+        value: 'delete',
+        child: Text('Sil', style: TextStyle(color: Colors.red)),
+      ));
+    }
+
+    if (items.isEmpty) {
+      items.add(const PopupMenuItem(
+        enabled: false,
+        value: '',
+        child: Text('Düzenleme izniniz yok', style: TextStyle(color: Colors.grey)),
+      ));
+    }
+
+    return items;
+  }
+
   void _toggleComplete(WidgetRef ref) {
     ref.read(tasksNotifierProvider.notifier).optimisticToggleComplete(task.id);
     ref.read(taskServiceProvider).toggleComplete(task.id, task.isCompleted);
+    _logIfGroupTask(ref, task.isCompleted ? 'task_uncompleted' : 'task_completed', '"${task.title}"');
   }
 
   void _onMenuAction(BuildContext context, WidgetRef ref, String action) {
@@ -273,7 +324,15 @@ class TaskCard extends ConsumerWidget {
         _showPostponeDialog(context, ref);
       case 'delete':
         _deleteTask(ref);
+      case 'toggle_lock':
+        _toggleLock(ref);
     }
+  }
+
+  void _toggleLock(WidgetRef ref) {
+    ref.read(tasksNotifierProvider.notifier).optimisticToggleLock(task.id);
+    ref.read(taskServiceProvider).toggleTaskLock(task.id, task.locked);
+    _logIfGroupTask(ref, task.locked ? 'task_unlocked' : 'task_locked', '"${task.title}"');
   }
 
   void _showEditDialog(BuildContext context, WidgetRef ref) {
@@ -326,6 +385,8 @@ class TaskCard extends ConsumerWidget {
         'title': newTitle,
         'description': cleanDesc.isEmpty ? null : cleanDesc,
       });
+
+      _logIfGroupTask(ref, 'task_edited', '"${task.title}"');
 
       // Diff subtasks: delete removed, create new, reorder all by text position
       final availableOriginals = [...task.subtasks]; // mutable copy
@@ -437,6 +498,7 @@ class TaskCard extends ConsumerWidget {
       Navigator.pop(ctx);
       ref.read(tasksNotifierProvider.notifier).optimisticBlockTask(task.id, reason.isEmpty ? null : reason);
       ref.read(taskServiceProvider).blockTask(task.id, reason);
+      _logIfGroupTask(ref, 'task_blocked', '"${task.title}"');
     }
 
     showAppDialog(
@@ -492,6 +554,7 @@ class TaskCard extends ConsumerWidget {
               Navigator.pop(context);
               ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
               ref.read(taskServiceProvider).postponeTask(task.id, tomorrow);
+              _logIfGroupTask(ref, 'task_postponed', '"${task.title}"');
             },
           ),
           ListTile(
@@ -509,6 +572,7 @@ class TaskCard extends ConsumerWidget {
               if (picked != null) {
                 ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
                 ref.read(taskServiceProvider).postponeTask(task.id, picked);
+                _logIfGroupTask(ref, 'task_postponed', '"${task.title}"');
               }
             },
           ),
@@ -519,6 +583,7 @@ class TaskCard extends ConsumerWidget {
   }
 
   void _deleteTask(WidgetRef ref) {
+    _logIfGroupTask(ref, 'task_deleted', '"${task.title}"');
     ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
     ref.read(taskServiceProvider).deleteTask(task.id);
   }
@@ -529,17 +594,20 @@ class TaskCard extends ConsumerWidget {
       'status': 'pending',
       'block_reason': null,
     });
+    _logIfGroupTask(ref, 'task_unblocked', '"${task.title}"');
   }
 
   void _toggleSubtask(WidgetRef ref, Subtask subtask) {
     ref.read(tasksNotifierProvider.notifier).optimisticToggleSubtask(task.id, subtask.id);
     ref.read(taskServiceProvider).toggleSubtaskComplete(subtask.id, subtask.isCompleted);
     ref.read(taskServiceProvider).checkAutoComplete(task.id);
+    _logIfGroupTask(ref, subtask.isCompleted ? 'subtask_uncompleted' : 'subtask_completed', '"${subtask.title}"');
   }
 
   void _deleteSubtask(WidgetRef ref, Subtask subtask) {
     ref.read(tasksNotifierProvider.notifier).optimisticDeleteSubtask(task.id, subtask.id);
     ref.read(taskServiceProvider).deleteSubtask(subtask.id);
+    _logIfGroupTask(ref, 'subtask_deleted', '"${subtask.title}"');
   }
 
   void _blockSubtask(BuildContext context, WidgetRef ref, Subtask subtask) {
@@ -564,6 +632,7 @@ class TaskCard extends ConsumerWidget {
             Navigator.pop(context);
             ref.read(tasksNotifierProvider.notifier).optimisticBlockSubtask(task.id, subtask.id, reason.isEmpty ? null : reason);
             ref.read(taskServiceProvider).blockSubtask(subtask.id, reason);
+            _logIfGroupTask(ref, 'subtask_blocked', '"${subtask.title}"');
           },
           style: ElevatedButton.styleFrom(backgroundColor: AppTheme.blockedColor),
           child: const Text('Bloke Et'),
@@ -596,6 +665,7 @@ class TaskCard extends ConsumerWidget {
             Navigator.pop(context);
             ref.read(tasksNotifierProvider.notifier).optimisticUpdateSubtask(task.id, subtask.id, newTitle);
             ref.read(taskServiceProvider).updateSubtask(subtask.id, {'title': newTitle});
+            _logIfGroupTask(ref, 'subtask_edited', '"${subtask.title}"');
           },
           style: ElevatedButton.styleFrom(backgroundColor: ref.read(currentOwnerColorProvider)),
           child: const Text('Kaydet'),
@@ -620,6 +690,22 @@ class TaskCard extends ConsumerWidget {
       ownerType: owner.ownerType,
       date: date,
       createdBy: user.id,
+    );
+
+    _logIfGroupTask(ref, 'subtask_promoted', '"${subtask.title}"');
+  }
+
+  /// Log activity if this is a group task
+  void _logIfGroupTask(WidgetRef ref, String action, String details) {
+    final owner = ref.read(ownerContextProvider);
+    final user = ref.read(currentUserProvider);
+    if (owner == null || user == null || owner.ownerType != 'group') return;
+
+    ref.read(groupServiceProvider).logActivity(
+      groupId: owner.ownerId,
+      userId: user.id,
+      action: action,
+      details: details,
     );
   }
 }
