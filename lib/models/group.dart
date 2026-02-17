@@ -5,6 +5,7 @@ class Group {
   final String inviteCode;
   final String color;
   final String? description;
+  final bool isPersonal;
   final Map<String, dynamic> settings;
   final DateTime createdAt;
 
@@ -15,6 +16,7 @@ class Group {
     required this.inviteCode,
     this.color = '#667eea',
     this.description,
+    this.isPersonal = false,
     this.settings = const {},
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -26,6 +28,7 @@ class Group {
     String? inviteCode,
     String? color,
     String? description,
+    bool? isPersonal,
     Map<String, dynamic>? settings,
     DateTime? createdAt,
   }) {
@@ -36,6 +39,7 @@ class Group {
       inviteCode: inviteCode ?? this.inviteCode,
       color: color ?? this.color,
       description: description ?? this.description,
+      isPersonal: isPersonal ?? this.isPersonal,
       settings: settings ?? this.settings,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -49,6 +53,7 @@ class Group {
       inviteCode: json['invite_code'] as String,
       color: json['color'] as String? ?? '#667eea',
       description: json['description'] as String?,
+      isPersonal: json['is_personal'] as bool? ?? false,
       settings: json['settings'] != null
           ? Map<String, dynamic>.from(json['settings'] as Map)
           : {},
@@ -66,6 +71,7 @@ class Group {
       'invite_code': inviteCode,
       'color': color,
       'description': description,
+      'is_personal': isPersonal,
       'settings': settings,
     };
   }
@@ -76,6 +82,7 @@ class Group {
       'created_by': createdBy,
       'color': color,
       'description': description,
+      'is_personal': isPersonal,
       'settings': settings,
     };
   }

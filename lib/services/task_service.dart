@@ -51,6 +51,7 @@ class TaskService {
     required String ownerId,
     required String ownerType,
     required DateTime date,
+    bool showPastIncomplete = false,
   }) {
     final dateStr = _dateKey(date);
 
@@ -60,8 +61,18 @@ class TaskService {
         .eq('owner_id', ownerId)
         .asyncMap((rows) async {
           // Filter by date, exclude deleted, and sort
+          // Optionally include past incomplete tasks
           final filtered = rows
-              .where((r) => r['date'] == dateStr && r['status'] != 'deleted')
+              .where((r) {
+                if (r['status'] == 'deleted') return false;
+                final rowDate = r['date'] as String?;
+                if (rowDate == dateStr) return true;
+                if (showPastIncomplete && rowDate != null && rowDate.compareTo(dateStr) < 0) {
+                  final status = r['status'] as String?;
+                  return status != 'completed';
+                }
+                return false;
+              })
               .toList()
             ..sort((a, b) => (a['sort_order'] as int).compareTo(b['sort_order'] as int));
 
