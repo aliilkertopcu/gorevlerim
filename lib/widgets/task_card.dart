@@ -582,6 +582,8 @@ class TaskCard extends ConsumerWidget {
         controller: titleController,
         decoration: const InputDecoration(labelText: 'Başlık'),
         autofocus: true,
+        maxLines: null,
+        minLines: 2,
       ),
       actions: [
         TextButton(

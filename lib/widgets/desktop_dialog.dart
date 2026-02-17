@@ -25,16 +25,14 @@ Future<T?> showAppDialog<T>({
   final isDesktop = screenSize.width > 600;
 
   if (!isDesktop) {
+    // Mobile: use Dialog with scrollable content to handle keyboard
     if (contentBuilder != null || actionsBuilder != null) {
       return showDialog<T>(
         context: context,
         builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setDialogState) => AlertDialog(
+          builder: (ctx, setDialogState) => _MobileDialog(
             title: title,
-            content: SizedBox(
-              width: double.maxFinite,
-              child: contentBuilder?.call(ctx, setDialogState) ?? content!,
-            ),
+            content: contentBuilder?.call(ctx, setDialogState) ?? content!,
             actions: actionsBuilder?.call(ctx, setDialogState) ?? actions ?? [],
           ),
         ),
@@ -42,12 +40,9 @@ Future<T?> showAppDialog<T>({
     }
     return showDialog<T>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => _MobileDialog(
         title: title,
-        content: SizedBox(
-          width: double.maxFinite,
-          child: content!,
-        ),
+        content: content!,
         actions: actions ?? [],
       ),
     );
@@ -68,6 +63,59 @@ Future<T?> showAppDialog<T>({
       screenSize: screenSize,
     ),
   );
+}
+
+/// Mobile dialog that properly handles keyboard by making content scrollable
+/// and keeping action buttons always visible.
+class _MobileDialog extends StatelessWidget {
+  final Widget title;
+  final Widget content;
+  final List<Widget> actions;
+
+  const _MobileDialog({
+    required this.title,
+    required this.content,
+    required this.actions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Title
+            DefaultTextStyle(
+              style: Theme.of(context).textTheme.titleLarge!,
+              child: title,
+            ),
+            const SizedBox(height: 16),
+            // Scrollable content
+            Flexible(
+              child: SingleChildScrollView(
+                child: content,
+              ),
+            ),
+            // Actions pinned at bottom
+            if (actions.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: actions
+                    .expand((w) => [w, const SizedBox(width: 8)])
+                    .toList()
+                  ..removeLast(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _DesktopDialog extends StatefulWidget {
@@ -118,6 +166,7 @@ class _DesktopDialogState extends State<_DesktopDialog> {
     final theme = Theme.of(context);
     final contentWidget = widget.contentBuilder?.call(context, setState) ?? widget.content!;
     final actionsWidgets = widget.actionsBuilder?.call(context, setState) ?? widget.actions ?? [];
+    final isResized = _height != null;
 
     return Stack(
       children: [
@@ -144,7 +193,7 @@ class _DesktopDialogState extends State<_DesktopDialog> {
                 borderRadius: BorderRadius.circular(12),
                 clipBehavior: Clip.antiAlias,
                 child: Column(
-                  mainAxisSize: _height == null ? MainAxisSize.min : MainAxisSize.max,
+                  mainAxisSize: isResized ? MainAxisSize.max : MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Draggable title bar
@@ -188,14 +237,17 @@ class _DesktopDialogState extends State<_DesktopDialog> {
                         ),
                       ),
                     ),
-                    // Content
-                    Flexible(
-                      child: SingleChildScrollView(
+                    // Content — fills available space when resized
+                    Expanded(
+                      flex: isResized ? 1 : 0,
+                      child: Padding(
                         padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                        child: contentWidget,
+                        child: isResized
+                            ? _buildExpandedContent(contentWidget)
+                            : SingleChildScrollView(child: contentWidget),
                       ),
                     ),
-                    // Actions
+                    // Actions pinned at bottom
                     if (actionsWidgets.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
@@ -241,5 +293,55 @@ class _DesktopDialogState extends State<_DesktopDialog> {
         ),
       ],
     );
+  }
+
+  /// When dialog is resized, expand the content to fill space.
+  /// Finds the last multiline TextField (Column child) and makes it Expanded.
+  Widget _buildExpandedContent(Widget contentWidget) {
+    // If the content is a Column, make the last multi-line TextField expanded
+    if (contentWidget is Column) {
+      final children = contentWidget.children;
+      // Find the last TextField-like widget index
+      int expandIndex = -1;
+      for (int i = children.length - 1; i >= 0; i--) {
+        final child = children[i];
+        if (child is TextField && (child.maxLines == null || child.maxLines! > 1)) {
+          expandIndex = i;
+          break;
+        }
+      }
+
+      if (expandIndex != -1) {
+        final expandedChildren = <Widget>[];
+        for (int i = 0; i < children.length; i++) {
+          if (i == expandIndex) {
+            expandedChildren.add(Expanded(child: children[i]));
+          } else {
+            expandedChildren.add(children[i]);
+          }
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.max,
+          crossAxisAlignment: contentWidget.crossAxisAlignment,
+          children: expandedChildren,
+        );
+      }
+    }
+
+    // If content is wrapped in a KeyboardListener, unwrap and process inner Column
+    if (contentWidget is KeyboardListener) {
+      final inner = contentWidget.child;
+      if (inner is Column) {
+        final processed = _buildExpandedContent(inner);
+        return KeyboardListener(
+          focusNode: contentWidget.focusNode,
+          onKeyEvent: contentWidget.onKeyEvent,
+          child: processed,
+        );
+      }
+    }
+
+    // Fallback: just scroll
+    return SingleChildScrollView(child: contentWidget);
   }
 }
