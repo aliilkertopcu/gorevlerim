@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -728,8 +729,10 @@ class TaskCard extends ConsumerWidget {
   }
 }
 
-/// Wrapper that provides press-and-hold animation (shadow + scale)
-/// and hover effect for task cards.
+/// Wrapper that provides 3-phase press-and-hold animation for task cards:
+/// Phase 1 (0–100ms): Threshold — no visual change
+/// Phase 2 (100–500ms): Gradual scale 1.0→1.04 + subtle shadow, pushes neighbors
+/// Phase 3 (500ms+): Drag mode takes over via proxyDecorator (70% opacity + heavy shadow)
 class _PressableCard extends StatefulWidget {
   final Widget child;
   final Color bgColor;
@@ -745,49 +748,96 @@ class _PressableCard extends StatefulWidget {
   State<_PressableCard> createState() => _PressableCardState();
 }
 
-class _PressableCardState extends State<_PressableCard> {
-  bool _isPressed = false;
+class _PressableCardState extends State<_PressableCard>
+    with SingleTickerProviderStateMixin {
   bool _isHovered = false;
+  Timer? _thresholdTimer;
+  late AnimationController _pressController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+  }
+
+  @override
+  void dispose() {
+    _thresholdTimer?.cancel();
+    _pressController.dispose();
+    super.dispose();
+  }
+
+  void _onPointerDown(PointerDownEvent _) {
+    _thresholdTimer?.cancel();
+    _thresholdTimer = Timer(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _pressController.forward();
+      }
+    });
+  }
+
+  void _cancelPress() {
+    _thresholdTimer?.cancel();
+    if (_pressController.isAnimating || _pressController.value > 0) {
+      _pressController.reverse();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Listener(
-      onPointerDown: (_) => setState(() => _isPressed = true),
-      onPointerUp: (_) => setState(() => _isPressed = false),
-      onPointerCancel: (_) => setState(() => _isPressed = false),
+      onPointerDown: _onPointerDown,
+      onPointerUp: (_) => _cancelPress(),
+      onPointerCancel: (_) => _cancelPress(),
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() {
-          _isHovered = false;
-          _isPressed = false;
-        }),
-        child: AnimatedScale(
-          scale: _isPressed ? 1.03 : 1.0,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.only(bottom: 4),
-            decoration: BoxDecoration(
-              color: _isHovered
-                  ? Color.lerp(widget.bgColor, Colors.grey, 0.08)
-                  : widget.bgColor,
-              borderRadius: BorderRadius.circular(8),
-              border: Border(
-                left: BorderSide(color: widget.statusColor, width: 4),
+        onExit: (_) {
+          setState(() => _isHovered = false);
+          _cancelPress();
+        },
+        child: AnimatedBuilder(
+          animation: _pressController,
+          builder: (context, child) {
+            final t = Curves.easeOutCubic.transform(_pressController.value);
+            final scale = 1.0 + (0.04 * t);
+            final extraMargin = 2.0 * t;
+            final bgColor = _isHovered
+                ? Color.lerp(widget.bgColor, Colors.grey, 0.08)!
+                : widget.bgColor;
+
+            return Container(
+              margin: EdgeInsets.only(
+                top: extraMargin,
+                bottom: 4 + extraMargin,
               ),
-              boxShadow: _isPressed
-                  ? [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: widget.child,
-          ),
+              child: Transform.scale(
+                scale: scale,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border(
+                      left: BorderSide(color: widget.statusColor, width: 4),
+                    ),
+                    boxShadow: t > 0.01
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06 + 0.10 * t),
+                              blurRadius: 2 + 8 * t,
+                              offset: Offset(0, 1 + 3 * t),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: child,
+                ),
+              ),
+            );
+          },
+          child: widget.child,
         ),
       ),
     );

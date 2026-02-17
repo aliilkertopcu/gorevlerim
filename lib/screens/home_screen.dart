@@ -320,13 +320,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   proxyDecorator: (child, index, animation) {
                                     return AnimatedBuilder(
                                       animation: animation,
-                                      builder: (context, child) => Opacity(
-                                        opacity: 0.85,
-                                        child: Material(
-                                          elevation: 8,
-                                          borderRadius: BorderRadius.circular(8),
-                                          color: Colors.transparent,
-                                          child: child,
+                                      builder: (context, child) => Transform.scale(
+                                        scale: 1.04,
+                                        child: Opacity(
+                                          opacity: 0.70,
+                                          child: Material(
+                                            elevation: 12,
+                                            borderRadius: BorderRadius.circular(8),
+                                            color: Colors.transparent,
+                                            child: child,
+                                          ),
                                         ),
                                       ),
                                       child: child,
