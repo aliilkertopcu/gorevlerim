@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
@@ -11,6 +12,7 @@ import '../widgets/group_selector.dart';
 import '../widgets/group_manager.dart';
 import '../widgets/ai_setup_dialog.dart';
 import '../widgets/desktop_dialog.dart';
+import '../version.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -136,6 +138,17 @@ class HomeScreen extends ConsumerWidget {
                                                 fontSize: 12,
                                               ),
                                             ),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuDivider(),
+                                      const PopupMenuItem(
+                                        value: 'onboarding',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.new_releases_outlined),
+                                            SizedBox(width: 12),
+                                            Text('Neler Yeni?'),
                                           ],
                                         ),
                                       ),
@@ -339,6 +352,8 @@ class HomeScreen extends ConsumerWidget {
           context: context,
           builder: (_) => const GroupManagerDialog(),
         );
+      case 'onboarding':
+        GoRouter.of(context).push('/onboarding');
       case 'theme':
         _showThemeDialog(context, ref);
       case 'logout':
@@ -428,26 +443,29 @@ class HomeScreen extends ConsumerWidget {
   Widget _buildFooter(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 24, bottom: 16),
-      child: Column(
-        children: [
-          Text(
-            'made with curiosity \u{1F9E0}',
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).hintColor,
-              fontWeight: FontWeight.w300,
+      child: GestureDetector(
+        onTap: () => GoRouter.of(context).push('/onboarding'),
+        child: Column(
+          children: [
+            Text(
+              'made with curiosity \u{1F9E0}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).hintColor,
+                fontWeight: FontWeight.w300,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '@izmir 2026',
-            style: TextStyle(
-              fontSize: 11,
-              color: Theme.of(context).hintColor.withValues(alpha: 0.7),
-              fontWeight: FontWeight.w300,
+            const SizedBox(height: 2),
+            Text(
+              'v$appVersion · @izmir 2026',
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).hintColor.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w300,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
