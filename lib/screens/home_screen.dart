@@ -190,6 +190,7 @@ class HomeScreen extends ConsumerWidget {
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                     style: TextButton.styleFrom(
+                                      foregroundColor: ownerColor,
                                       padding: const EdgeInsets.symmetric(horizontal: 8),
                                       minimumSize: const Size(0, 32),
                                     ),
@@ -292,6 +293,7 @@ class HomeScreen extends ConsumerWidget {
                                     const SizedBox(height: 12),
                                     ElevatedButton(
                                       onPressed: () => ref.invalidate(tasksStreamProvider),
+                                      style: ElevatedButton.styleFrom(backgroundColor: ownerColor),
                                       child: const Text('Tekrar Dene'),
                                     ),
                                   ],

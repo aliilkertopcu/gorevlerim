@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task.dart';
 import '../providers/task_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/group_provider.dart';
 import '../theme/app_theme.dart';
 import 'custom_drag_listener.dart';
 import 'desktop_dialog.dart';
@@ -142,7 +143,7 @@ class TaskCard extends ConsumerWidget {
                             Icon(
                               isExpanded ? Icons.expand_less : Icons.expand_more,
                               size: 18,
-                              color: Colors.grey[400],
+                              color: ref.watch(currentOwnerColorProvider).withValues(alpha: 0.6),
                             ),
                           ],
                         ],
@@ -421,6 +422,7 @@ class TaskCard extends ConsumerWidget {
         ),
         ElevatedButton(
           onPressed: () => saveEdit(context),
+          style: ElevatedButton.styleFrom(backgroundColor: ref.read(currentOwnerColorProvider)),
           child: const Text('Kaydet'),
         ),
       ],
@@ -563,6 +565,7 @@ class TaskCard extends ConsumerWidget {
             ref.read(tasksNotifierProvider.notifier).optimisticBlockSubtask(task.id, subtask.id, reason.isEmpty ? null : reason);
             ref.read(taskServiceProvider).blockSubtask(subtask.id, reason);
           },
+          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.blockedColor),
           child: const Text('Bloke Et'),
         ),
       ],
@@ -592,6 +595,7 @@ class TaskCard extends ConsumerWidget {
             ref.read(tasksNotifierProvider.notifier).optimisticUpdateSubtask(task.id, subtask.id, newTitle);
             ref.read(taskServiceProvider).updateSubtask(subtask.id, {'title': newTitle});
           },
+          style: ElevatedButton.styleFrom(backgroundColor: ref.read(currentOwnerColorProvider)),
           child: const Text('Kaydet'),
         ),
       ],
