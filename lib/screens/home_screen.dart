@@ -10,6 +10,7 @@ import '../widgets/task_form.dart';
 import '../widgets/group_selector.dart';
 import '../widgets/group_manager.dart';
 import '../widgets/ai_setup_dialog.dart';
+import '../widgets/desktop_dialog.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -158,7 +159,46 @@ class HomeScreen extends ConsumerWidget {
                             const DateNav(),
                             const SizedBox(height: 8),
                             const TaskForm(),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
+                            // Expand/Collapse all button
+                            tasksAsync.when(
+                              data: (tasks) {
+                                final hasExpandable = tasks.any((t) =>
+                                    t.subtasks.isNotEmpty ||
+                                    (t.description != null && t.description!.isNotEmpty) ||
+                                    (t.isBlocked && t.blockReason != null));
+                                if (!hasExpandable || tasks.isEmpty) return const SizedBox.shrink();
+                                final collapsed = ref.watch(collapsedTasksProvider);
+                                final allCollapsed = tasks.every((t) => collapsed.contains(t.id));
+                                return Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () {
+                                      if (allCollapsed) {
+                                        ref.read(collapsedTasksProvider.notifier).state = {};
+                                      } else {
+                                        ref.read(collapsedTasksProvider.notifier).state =
+                                            tasks.map((t) => t.id).toSet();
+                                      }
+                                    },
+                                    icon: Icon(
+                                      allCollapsed ? Icons.unfold_more : Icons.unfold_less,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      allCollapsed ? 'Tümünü Aç' : 'Tümünü Kapat',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      minimumSize: const Size(0, 32),
+                                    ),
+                                  ),
+                                );
+                              },
+                              loading: () => const SizedBox.shrink(),
+                              error: (_, _) => const SizedBox.shrink(),
+                            ),
                             // Task list content
                             tasksAsync.when(
                               data: (tasks) {
@@ -213,9 +253,17 @@ class HomeScreen extends ConsumerWidget {
                                     );
                                   },
                                   proxyDecorator: (child, index, animation) {
-                                    return Material(
-                                      elevation: 4,
-                                      borderRadius: BorderRadius.circular(8),
+                                    return AnimatedBuilder(
+                                      animation: animation,
+                                      builder: (context, child) => Opacity(
+                                        opacity: 0.85,
+                                        child: Material(
+                                          elevation: 8,
+                                          borderRadius: BorderRadius.circular(8),
+                                          color: Colors.transparent,
+                                          child: child,
+                                        ),
+                                      ),
                                       child: child,
                                     );
                                   },
@@ -299,37 +347,36 @@ class HomeScreen extends ConsumerWidget {
   void _showThemeDialog(BuildContext context, WidgetRef ref) {
     final currentTheme = ref.read(themeNotifierProvider);
 
-    showDialog(
+    showAppDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Tema Seçimi'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildThemeOption(
-              context, ref,
-              AppThemeMode.light,
-              'Açık',
-              Icons.light_mode,
-              currentTheme,
-            ),
-            _buildThemeOption(
-              context, ref,
-              AppThemeMode.dark,
-              'Koyu',
-              Icons.dark_mode,
-              currentTheme,
-            ),
-            _buildThemeOption(
-              context, ref,
-              AppThemeMode.system,
-              'Otomatik',
-              Icons.brightness_auto,
-              currentTheme,
-            ),
-          ],
-        ),
+      title: const Text('Tema Seçimi'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildThemeOption(
+            context, ref,
+            AppThemeMode.light,
+            'Açık',
+            Icons.light_mode,
+            currentTheme,
+          ),
+          _buildThemeOption(
+            context, ref,
+            AppThemeMode.dark,
+            'Koyu',
+            Icons.dark_mode,
+            currentTheme,
+          ),
+          _buildThemeOption(
+            context, ref,
+            AppThemeMode.system,
+            'Otomatik',
+            Icons.brightness_auto,
+            currentTheme,
+          ),
+        ],
       ),
+      actions: [],
     );
   }
 
