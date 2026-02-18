@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task.dart';
+import 'focus_mode.dart';
 import '../providers/task_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
@@ -291,6 +292,15 @@ class TaskCard extends ConsumerWidget {
         child: Text(task.isBlocked ? 'Blokeyi Kaldır' : 'Bloke Et'),
       ));
       items.add(const PopupMenuItem(value: 'postpone', child: Text('Ertele')));
+      items.add(const PopupMenuItem(
+        value: 'focus',
+        child: Row(
+          children: [
+            Text('Odaklan '),
+            Text('🎯', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+      ));
     }
 
     if (showLockToggle) {
@@ -344,6 +354,8 @@ class TaskCard extends ConsumerWidget {
         _showPostponeDialog(context, ref);
       case 'delete':
         _deleteTask(ref);
+      case 'focus':
+        showFocusMode(context, ref, task);
       case 'toggle_lock':
         _toggleLock(ref);
     }
