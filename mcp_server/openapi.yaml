@@ -16,12 +16,13 @@ servers:
     description: Supabase Edge Function
 
 components:
+  schemas: {}
   securitySchemes:
     OAuth2:
       type: oauth2
       flows:
         authorizationCode:
-          authorizationUrl: https://aliilkertopcu.github.io/gorevlerim/#/gpt-connect
+          authorizationUrl: https://njzmorqwcsdnjjtvvmgd.supabase.co/functions/v1/gpt-auth
           tokenUrl: https://njzmorqwcsdnjjtvvmgd.supabase.co/functions/v1/gpt-oauth
           scopes:
             tasks: Görevlere okuma ve yazma erişimi
