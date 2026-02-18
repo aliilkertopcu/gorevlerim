@@ -47,6 +47,27 @@ async function authenticateRequest(req: Request): Promise<string | null> {
   return data.user_id;
 }
 
+// Resolve owner: prefer explicit group_id param, otherwise use user's personal group
+async function resolveOwner(
+  userId: string,
+  groupId?: string | null
+): Promise<{ ownerId: string; ownerType: "group" }> {
+  if (groupId) {
+    return { ownerId: groupId, ownerType: "group" };
+  }
+
+  const { data } = await supabase
+    .from("groups")
+    .select("id")
+    .eq("created_by", userId)
+    .eq("is_personal", true)
+    .single();
+
+  if (!data) throw new Error("Kişisel grup bulunamadı. Lütfen uygulamaya bir kez giriş yapın.");
+
+  return { ownerId: data.id, ownerType: "group" };
+}
+
 Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
@@ -70,8 +91,7 @@ Deno.serve(async (req) => {
     // GET /tasks — list tasks for a date
     if (method === "GET" && (path === "tasks" || path === "")) {
       const date = formatDate(url.searchParams.get("date") || "today");
-      const ownerId = url.searchParams.get("owner_id") || userId;
-      const ownerType = url.searchParams.get("owner_type") || "user";
+      const { ownerId, ownerType } = await resolveOwner(userId, url.searchParams.get("group_id"));
 
       const { data: tasks, error } = await supabase
         .from("tasks")
@@ -79,6 +99,7 @@ Deno.serve(async (req) => {
         .eq("owner_id", ownerId)
         .eq("owner_type", ownerType)
         .eq("date", date)
+        .neq("status", "deleted")
         .order("sort_order", { ascending: true });
 
       if (error) throw error;
@@ -117,8 +138,7 @@ Deno.serve(async (req) => {
     if (method === "POST" && (path === "tasks" || path === "")) {
       const body = await req.json();
       const date = formatDate(body.date || "today");
-      const ownerId = body.owner_id || userId;
-      const ownerType = body.owner_type || "user";
+      const { ownerId, ownerType } = await resolveOwner(userId, body.group_id);
       const createdBy = userId;
 
       // Support comma-separated titles or array
@@ -254,8 +274,7 @@ Deno.serve(async (req) => {
     if (method === "POST" && path === "tasks/complete") {
       const body = await req.json();
       const date = formatDate(body.date || "today");
-      const ownerId = body.owner_id || userId;
-      const ownerType = body.owner_type || "user";
+      const { ownerId, ownerType } = await resolveOwner(userId, body.group_id);
       const taskNumber = body.task_number;
 
       if (!taskNumber) throw new Error("task_number required");
@@ -266,6 +285,7 @@ Deno.serve(async (req) => {
         .eq("owner_id", ownerId)
         .eq("owner_type", ownerType)
         .eq("date", date)
+        .neq("status", "deleted")
         .order("sort_order", { ascending: true });
 
       if (!tasks || taskNumber > tasks.length) {
@@ -320,8 +340,7 @@ Deno.serve(async (req) => {
       const body = await req.json();
       const date = formatDate(body.date || "today");
       const targetDate = formatDate(body.target_date || "tomorrow");
-      const ownerId = body.owner_id || userId;
-      const ownerType = body.owner_type || "user";
+      const { ownerId, ownerType } = await resolveOwner(userId, body.group_id);
       const taskNumber = body.task_number;
 
       if (!taskNumber) throw new Error("task_number required");
@@ -332,6 +351,7 @@ Deno.serve(async (req) => {
         .eq("owner_id", ownerId)
         .eq("owner_type", ownerType)
         .eq("date", date)
+        .neq("status", "deleted")
         .order("sort_order", { ascending: true });
 
       if (!tasks || taskNumber > tasks.length) {
@@ -364,6 +384,40 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({
         message: `"${target.title}" ${targetDate} tarihine ertelendi`,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
+      });
+    }
+
+    // GET /groups — list user's groups
+    if (method === "GET" && path === "groups") {
+      const { data: memberships } = await supabase
+        .from("group_members")
+        .select("group_id")
+        .eq("user_id", userId);
+
+      const groupIds = memberships?.map((m: any) => m.group_id) || [];
+      if (groupIds.length === 0) {
+        return new Response(JSON.stringify({ groups: [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
+        });
+      }
+
+      const { data: groups, error } = await supabase
+        .from("groups")
+        .select("id, name, color, is_personal")
+        .in("id", groupIds)
+        .order("is_personal", { ascending: false });
+
+      if (error) throw error;
+
+      return new Response(JSON.stringify({
+        groups: groups?.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          color: g.color,
+          is_personal: g.is_personal,
+        })),
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
       });
