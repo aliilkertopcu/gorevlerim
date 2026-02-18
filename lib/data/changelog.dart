@@ -15,6 +15,14 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.21.0',
+    date: '2026-02-18',
+    features: [
+      'Yeni kullanıcılara otomatik hoşgeldin görevi — YouTube ve Custom GPT linkleriyle uygulama turu',
+      'Alt görev başlıklarında tıklanabilir link desteği — [metin](url) Markdown formatıyla',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.20.0',
     date: '2026-02-18',
     features: [
