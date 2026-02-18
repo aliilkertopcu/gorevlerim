@@ -2,16 +2,15 @@ openapi: 3.1.0
 info:
   title: Görevlerim API
   description: |
-    Kişisel görev yönetimi için API. Görevler grup tabanlıdır; varsayılan olarak
-    kişisel "Günlük Görevler" grubu kullanılır. İsteğe bağlı olarak `group_id`
-    parametresiyle paylaşılan gruplara da görev eklenebilir.
+    Kişisel görev yönetimi için API. Her kullanıcı kendi api_key'ini sağlar.
+    api_key, Görevlerim uygulamasının ayarlar ekranından elde edilir.
 
     Tarih formatları:
     - "today" veya "bugün" → bugünün tarihi
     - "tomorrow" veya "yarın" → yarının tarihi
     - "yesterday" veya "dün" → dünün tarihi
     - "YYYY-MM-DD" → belirli tarih
-  version: 3.0.0
+  version: 3.1.0
 
 servers:
   - url: https://njzmorqwcsdnjjtvvmgd.supabase.co/functions/v1/todo-api
@@ -23,6 +22,8 @@ paths:
       operationId: listGroups
       summary: Grupları listele
       description: Kullanıcının üye olduğu tüm grupları listeler (kişisel grup dahil)
+      parameters:
+        - $ref: "#/components/parameters/ApiKey"
       responses:
         "200":
           description: Grup listesi
@@ -40,8 +41,9 @@ paths:
     get:
       operationId: listTasks
       summary: Görevleri listele
-      description: Belirli bir tarihteki tüm görevleri alt görevleriyle birlikte getirir. Varsayılan olarak kişisel grup görevleri listelenir.
+      description: Belirli bir tarihteki tüm görevleri alt görevleriyle birlikte getirir.
       parameters:
+        - $ref: "#/components/parameters/ApiKey"
         - name: date
           in: query
           schema:
@@ -81,6 +83,8 @@ paths:
         - Tek görev: title alanını kullan
         - Çoklu görev: virgülle ayır ("market, fatura, spor") veya titles array kullan
         - Alt görevler: description içinde "* " ile başlayan satırlar veya subtasks array
+      parameters:
+        - $ref: "#/components/parameters/ApiKey"
       requestBody:
         required: true
         content:
@@ -158,6 +162,8 @@ paths:
       operationId: completeTask
       summary: Görevi tamamla (numara ile)
       description: Listede görünen sıra numarasına göre görevi tamamlar
+      parameters:
+        - $ref: "#/components/parameters/ApiKey"
       requestBody:
         required: true
         content:
@@ -198,6 +204,8 @@ paths:
       operationId: postponeTask
       summary: Görevi ertele (numara ile)
       description: Görevi başka bir tarihe erteler
+      parameters:
+        - $ref: "#/components/parameters/ApiKey"
       requestBody:
         required: true
         content:
@@ -242,6 +250,7 @@ paths:
       operationId: updateTask
       summary: Görevi güncelle (ID ile)
       parameters:
+        - $ref: "#/components/parameters/ApiKey"
         - name: task_id
           in: path
           required: true
@@ -274,6 +283,7 @@ paths:
       operationId: deleteTask
       summary: Görevi sil (ID ile)
       parameters:
+        - $ref: "#/components/parameters/ApiKey"
         - name: task_id
           in: path
           required: true
@@ -285,6 +295,15 @@ paths:
           description: Görev silindi
 
 components:
+  parameters:
+    ApiKey:
+      name: api_key
+      in: query
+      required: true
+      schema:
+        type: string
+      description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
+
   schemas:
     Group:
       type: object
@@ -329,12 +348,3 @@ components:
                 type: string
               status:
                 type: string
-
-  securitySchemes:
-    apiKey:
-      type: apiKey
-      name: x-api-key
-      in: header
-
-security:
-  - apiKey: []
