@@ -15,6 +15,17 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.20.0',
+    date: '2026-02-18',
+    features: [
+      'Odak Modu — görev menüsünden "Odaklan 🎯" ile Pomodoro zamanlayıcı açılır',
+      'Süre seçimi: 15, 25, 45 veya 60 dakika',
+      'Süre bitince overtime modu — sayaç yukarı saymaya devam eder',
+      'Odak modunda alt görevleri tıklayarak tamamlayabilirsin',
+      'Odak tamamlanınca görevi de tamamlama seçeneği',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.19.2',
     date: '2026-02-18',
     fixes: [
