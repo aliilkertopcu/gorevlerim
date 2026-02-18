@@ -20,8 +20,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = await req.json();
-    const { code, grant_type } = body;
+    // OAuth token requests use application/x-www-form-urlencoded
+    const contentType = req.headers.get("content-type") ?? "";
+    let code: string | null = null;
+    let grant_type: string | null = null;
+
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const text = await req.text();
+      const params = new URLSearchParams(text);
+      code = params.get("code");
+      grant_type = params.get("grant_type");
+    } else {
+      const body = await req.json();
+      code = body.code;
+      grant_type = body.grant_type;
+    }
 
     if (grant_type !== "authorization_code") {
       return new Response(JSON.stringify({ error: "unsupported_grant_type" }), {
