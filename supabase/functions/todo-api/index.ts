@@ -26,7 +26,10 @@ function formatDate(dateStr?: string): string {
 
 // Authenticate request using api_keys table
 async function authenticateRequest(req: Request): Promise<string | null> {
-  const apiKey = req.headers.get("x-api-key") || new URL(req.url).searchParams.get("api_key");
+  // Support: Authorization: Bearer xxx, x-api-key header, or api_key query param
+  const authHeader = req.headers.get("authorization");
+  const bearerKey = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const apiKey = bearerKey || req.headers.get("x-api-key") || new URL(req.url).searchParams.get("api_key");
   if (!apiKey) return null;
 
   const { data, error } = await supabase
