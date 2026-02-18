@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/task.dart';
 import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
@@ -33,12 +36,22 @@ class _FocusModeDialogState extends ConsumerState<_FocusModeDialog> {
   int _remainingSeconds = 25 * 60;
   int _overtimeSeconds = 0;
   Timer? _timer;
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+  }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _focusNode.dispose();
     super.dispose();
   }
+
+  void _close() => Navigator.of(context).pop();
 
   void _start() {
     setState(() {
@@ -80,7 +93,7 @@ class _FocusModeDialogState extends ConsumerState<_FocusModeDialog> {
     _startTimer();
   }
 
-  void _complete() {
+  void _finish() {
     _timer?.cancel();
     showDialog(
       context: context,
@@ -140,47 +153,82 @@ class _FocusModeDialogState extends ConsumerState<_FocusModeDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isOvertime = _focusState == _FocusState.overtime;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1a1a2e) : const Color(0xFFF5F5FA),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  // Task title
-                  Text(
-                    task.title,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.grey[800],
+    return KeyboardListener(
+      focusNode: _focusNode,
+      onKeyEvent: (event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          _close();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF1a1a2e) : const Color(0xFFF5F5FA),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    // Close button row
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Kapat (ESC)',
+                        onPressed: _close,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 40),
-                  // Timer display
-                  _buildTimer(accentColor, isDark, isOvertime),
-                  const SizedBox(height: 32),
-                  // Duration chips (only in idle)
-                  if (_focusState == _FocusState.idle) ...[
-                    _buildDurationChips(accentColor, isDark),
+                    const SizedBox(height: 8),
+                    // Task title
+                    Text(
+                      task.title,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.grey[800],
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // Task description
+                    if (task.description != null && task.description!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        task.description!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 32),
+                    // Timer display
+                    _buildTimer(accentColor, isDark, isOvertime),
+                    const SizedBox(height: 32),
+                    // Duration chips (only in idle)
+                    if (_focusState == _FocusState.idle) ...[
+                      _buildDurationChips(accentColor, isDark),
+                      const SizedBox(height: 32),
+                    ],
+                    // Subtasks
+                    if (task.subtasks.isNotEmpty) ...[
+                      Expanded(child: _buildSubtasks(task, accentColor, isDark)),
+                    ] else
+                      const Spacer(),
+                    // Action buttons
+                    _buildActions(accentColor),
                     const SizedBox(height: 32),
                   ],
-                  // Subtasks
-                  if (task.subtasks.isNotEmpty) ...[
-                    Expanded(child: _buildSubtasks(task, accentColor, isDark)),
-                  ] else
-                    const Spacer(),
-                  // Action buttons
-                  _buildActions(accentColor),
-                  const SizedBox(height: 32),
-                ],
+                ),
               ),
             ),
           ),
@@ -290,8 +338,8 @@ class _FocusModeDialogState extends ConsumerState<_FocusModeDialog> {
                   activeColor: accent,
                   onChanged: (_) => _toggleSubtask(subtask),
                 ),
-                title: Text(
-                  subtask.title,
+                title: _LinkText(
+                  text: subtask.title,
                   style: TextStyle(
                     fontSize: 15,
                     decoration: subtask.isCompleted
@@ -345,9 +393,9 @@ class _FocusModeDialogState extends ConsumerState<_FocusModeDialog> {
             ),
             const SizedBox(width: 16),
             FilledButton.icon(
-              onPressed: _complete,
-              icon: const Icon(Icons.check),
-              label: const Text('Tamamla'),
+              onPressed: _finish,
+              icon: const Icon(Icons.stop),
+              label: const Text('Bitir'),
               style: FilledButton.styleFrom(
                 backgroundColor: accent,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -357,5 +405,88 @@ class _FocusModeDialogState extends ConsumerState<_FocusModeDialog> {
           ],
         );
     }
+  }
+}
+
+/// Renders text with inline tappable links.
+/// Supports [label](url) markdown syntax and bare https:// URLs.
+class _LinkText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+
+  const _LinkText({required this.text, required this.style});
+
+  @override
+  State<_LinkText> createState() => _LinkTextState();
+}
+
+class _LinkTextState extends State<_LinkText> {
+  static final _linkRegex = RegExp(r'\[([^\]]+)\]\((https?://[^)]+)\)|(https?://\S+)');
+
+  final List<TapGestureRecognizer> _recognizers = [];
+  late List<InlineSpan> _spans;
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuildSpans();
+  }
+
+  @override
+  void didUpdateWidget(_LinkText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text || oldWidget.style != widget.style) {
+      _rebuildSpans();
+    }
+  }
+
+  void _rebuildSpans() {
+    for (final r in _recognizers) { r.dispose(); }
+    _recognizers.clear();
+
+    final text = widget.text;
+    final matches = _linkRegex.allMatches(text).toList();
+    if (matches.isEmpty) {
+      _spans = [TextSpan(text: text)];
+      return;
+    }
+
+    final spans = <InlineSpan>[];
+    int lastEnd = 0;
+    for (final match in matches) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
+      }
+      final label = match.group(1) ?? match.group(3)!;
+      final url   = match.group(2) ?? match.group(3)!;
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      _recognizers.add(recognizer);
+      spans.add(TextSpan(
+        text: label,
+        style: widget.style.copyWith(
+          color: Colors.blue,
+          decoration: TextDecoration.underline,
+          decorationColor: Colors.blue,
+        ),
+        recognizer: recognizer,
+      ));
+      lastEnd = match.end;
+    }
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+    _spans = spans;
+  }
+
+  @override
+  void dispose() {
+    for (final r in _recognizers) { r.dispose(); }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text.rich(TextSpan(children: _spans), style: widget.style);
   }
 }
