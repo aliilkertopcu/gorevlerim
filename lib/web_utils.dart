@@ -9,3 +9,7 @@ void cleanUrlAfterOAuth() {
     html.window.history.replaceState(null, '', cleanUrl);
   }
 }
+
+void openUrl(String url) {
+  html.window.location.href = url;
+}

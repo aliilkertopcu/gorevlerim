@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/task_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
+import '../web_utils.dart' if (dart.library.io) '../web_utils_stub.dart';
 import 'desktop_dialog.dart';
 
 const _chatGptUrl = 'https://chatgpt.com/g/g-698064fcef40819193c8d429b724f1b1-gorevlerim';
@@ -16,25 +18,58 @@ class TaskForm extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ownerColor = ref.watch(currentOwnerColorProvider);
 
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () => _showAddTaskDialog(context, ref),
-        onLongPress: () => launchUrl(
-          Uri.parse(_chatGptUrl),
-          mode: LaunchMode.externalApplication,
-        ),
-        icon: const Icon(Icons.add),
-        label: const Text('Yeni Görev Ekle'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ownerColor,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+    return Row(
+      children: [
+        // Ana buton — Yeni Görev Ekle
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () => _showAddTaskDialog(context, ref),
+            icon: const Icon(Icons.add),
+            label: const Text('Yeni Görev Ekle'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ownerColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
         ),
-      ),
+        const SizedBox(width: 8),
+        // ChatGPT butonu
+        SizedBox(
+          height: 48,
+          width: 48,
+          child: ElevatedButton(
+            onPressed: () {
+              if (kIsWeb) {
+                openUrl(_chatGptUrl);
+              } else {
+                launchUrl(
+                  Uri.parse(_chatGptUrl),
+                  mode: LaunchMode.externalApplication,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF000000),
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Image.network(
+              'https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg',
+              width: 24,
+              height: 24,
+              errorBuilder: (_, __, ___) =>
+                  const Icon(Icons.smart_toy, size: 22, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
