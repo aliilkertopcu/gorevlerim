@@ -15,6 +15,16 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.21.1',
+    date: '2026-02-18',
+    fixes: [
+      'Odak modunda tıklanabilir link desteği (alt görevlerde)',
+      'Odak modunda ana görevin açıklaması görüntüleniyor',
+      'Odak moduna X butonu ve ESC ile çıkış eklendi',
+      '"Tamamla" butonu "Bitir" olarak güncellendi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.21.0',
     date: '2026-02-18',
     features: [
