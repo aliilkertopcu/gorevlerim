@@ -15,6 +15,13 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.19.2',
+    date: '2026-02-18',
+    fixes: [
+      'Safari tarayıcısında onboarding sayfasının boş görünme sorunu düzeltildi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.19.1',
     date: '2026-02-17',
     fixes: [
