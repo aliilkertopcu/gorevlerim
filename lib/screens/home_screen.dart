@@ -10,7 +10,7 @@ import '../widgets/task_card.dart';
 import '../widgets/task_form.dart';
 import '../widgets/group_selector.dart';
 import '../widgets/group_manager.dart';
-import '../widgets/ai_setup_dialog.dart';
+// import '../widgets/ai_setup_dialog.dart'; // OAuth ile otomatik bağlantı kurulduğundan devre dışı
 import '../widgets/desktop_dialog.dart';
 import '../version.dart';
 
@@ -152,17 +152,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     tooltip: 'Menü',
                                     onSelected: (value) => _onMenuAction(context, value),
                                     itemBuilder: (context) => [
-                                      const PopupMenuItem(
-                                        value: 'ai',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.smart_toy),
-                                            SizedBox(width: 12),
-                                            Text('AI Entegrasyonu'),
-                                          ],
-                                        ),
-                                      ),
-                                      const PopupMenuDivider(),
+                                      // OAuth ile otomatik bağlantı kurulduğundan
+                                      // manuel AI Entegrasyonu menüsü artık gerekmiyor.
+                                      // const PopupMenuItem(
+                                      //   value: 'ai',
+                                      //   child: Row(
+                                      //     children: [
+                                      //       Icon(Icons.smart_toy),
+                                      //       SizedBox(width: 12),
+                                      //       Text('AI Entegrasyonu'),
+                                      //     ],
+                                      //   ),
+                                      // ),
+                                      // const PopupMenuDivider(),
                                       const PopupMenuItem(
                                         value: 'groups',
                                         child: Row(
@@ -399,11 +401,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _onMenuAction(BuildContext context, String action) {
     switch (action) {
-      case 'ai':
-        showDialog(
-          context: context,
-          builder: (_) => const AISetupDialog(),
-        );
+      // case 'ai':
+      //   showDialog(
+      //     context: context,
+      //     builder: (_) => const AISetupDialog(),
+      //   );
       case 'groups':
         showDialog(
           context: context,
