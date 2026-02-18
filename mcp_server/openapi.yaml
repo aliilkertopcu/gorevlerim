@@ -10,7 +10,7 @@ info:
     - "tomorrow" veya "yarın" → yarının tarihi
     - "yesterday" veya "dün" → dünün tarihi
     - "YYYY-MM-DD" → belirli tarih
-  version: 3.1.0
+  version: 3.2.0
 
 servers:
   - url: https://njzmorqwcsdnjjtvvmgd.supabase.co/functions/v1/todo-api
@@ -23,7 +23,12 @@ paths:
       summary: Grupları listele
       description: Kullanıcının üye olduğu tüm grupları listeler (kişisel grup dahil)
       parameters:
-        - $ref: "#/components/parameters/ApiKey"
+        - name: api_key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
       responses:
         "200":
           description: Grup listesi
@@ -35,7 +40,16 @@ paths:
                   groups:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Group"
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        color:
+                          type: string
+                        is_personal:
+                          type: boolean
 
   /tasks:
     get:
@@ -43,7 +57,12 @@ paths:
       summary: Görevleri listele
       description: Belirli bir tarihteki tüm görevleri alt görevleriyle birlikte getirir.
       parameters:
-        - $ref: "#/components/parameters/ApiKey"
+        - name: api_key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
         - name: date
           in: query
           schema:
@@ -54,7 +73,6 @@ paths:
           in: query
           schema:
             type: string
-            format: uuid
           description: "Grup ID'si. Belirtilmezse kişisel grup kullanılır."
       responses:
         "200":
@@ -73,7 +91,29 @@ paths:
                   tasks:
                     type: array
                     items:
-                      $ref: "#/components/schemas/TaskSummary"
+                      type: object
+                      properties:
+                        number:
+                          type: integer
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        description:
+                          type: string
+                        status:
+                          type: string
+                        subtasks:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              title:
+                                type: string
+                              status:
+                                type: string
 
     post:
       operationId: createTasks
@@ -84,22 +124,24 @@ paths:
         - Çoklu görev: virgülle ayır ("market, fatura, spor") veya titles array kullan
         - Alt görevler: description içinde "* " ile başlayan satırlar veya subtasks array
       parameters:
-        - $ref: "#/components/parameters/ApiKey"
+        - name: api_key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - title
               properties:
                 title:
                   type: string
                   description: "Görev başlığı. Virgülle ayrılmış birden fazla görev yazılabilir."
-                titles:
-                  type: array
-                  items:
-                    type: string
-                  description: "Alternatif: Görev başlıkları array olarak"
                 description:
                   type: string
                   description: "Açıklama. '* ' ile başlayan satırlar alt görev olur."
@@ -114,27 +156,7 @@ paths:
                   description: "Tarih (today, tomorrow, yesterday veya YYYY-MM-DD)"
                 group_id:
                   type: string
-                  format: uuid
                   description: "Görevin ekleneceği grup. Belirtilmezse kişisel grup kullanılır."
-              required:
-                - title
-            examples:
-              single:
-                summary: Tek görev
-                value:
-                  title: "Market alışverişi"
-                  date: "today"
-              multiple:
-                summary: Virgülle çoklu görev
-                value:
-                  title: "Market, fatura öde, spor"
-                  date: "today"
-              with_subtasks:
-                summary: Alt görevli
-                value:
-                  title: "Proje toplantısı"
-                  subtasks: ["Sunum hazırla", "Notları gözden geçir"]
-                  date: "tomorrow"
       responses:
         "201":
           description: Görev(ler) oluşturuldu
@@ -163,13 +185,20 @@ paths:
       summary: Görevi tamamla (numara ile)
       description: Listede görünen sıra numarasına göre görevi tamamlar
       parameters:
-        - $ref: "#/components/parameters/ApiKey"
+        - name: api_key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - task_number
               properties:
                 task_number:
                   type: integer
@@ -179,13 +208,7 @@ paths:
                   default: today
                 group_id:
                   type: string
-                  format: uuid
                   description: "Grup ID'si. Belirtilmezse kişisel grup kullanılır."
-              required:
-                - task_number
-            example:
-              task_number: 3
-              date: "today"
       responses:
         "200":
           description: Görev tamamlandı
@@ -196,8 +219,6 @@ paths:
                 properties:
                   message:
                     type: string
-                  task:
-                    $ref: "#/components/schemas/TaskSummary"
 
   /tasks/postpone:
     post:
@@ -205,13 +226,20 @@ paths:
       summary: Görevi ertele (numara ile)
       description: Görevi başka bir tarihe erteler
       parameters:
-        - $ref: "#/components/parameters/ApiKey"
+        - name: api_key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - task_number
               properties:
                 task_number:
                   type: integer
@@ -226,14 +254,7 @@ paths:
                   description: "Ertelenecek tarih"
                 group_id:
                   type: string
-                  format: uuid
                   description: "Grup ID'si. Belirtilmezse kişisel grup kullanılır."
-              required:
-                - task_number
-            example:
-              task_number: 2
-              date: "today"
-              target_date: "tomorrow"
       responses:
         "200":
           description: Görev ertelendi
@@ -250,13 +271,17 @@ paths:
       operationId: updateTask
       summary: Görevi güncelle (ID ile)
       parameters:
-        - $ref: "#/components/parameters/ApiKey"
+        - name: api_key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
         - name: task_id
           in: path
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         required: true
         content:
@@ -283,68 +308,17 @@ paths:
       operationId: deleteTask
       summary: Görevi sil (ID ile)
       parameters:
-        - $ref: "#/components/parameters/ApiKey"
+        - name: api_key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
         - name: task_id
           in: path
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         "200":
           description: Görev silindi
-
-components:
-  parameters:
-    ApiKey:
-      name: api_key
-      in: query
-      required: true
-      schema:
-        type: string
-      description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
-
-  schemas:
-    Group:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        color:
-          type: string
-        is_personal:
-          type: boolean
-          description: "true ise kişisel (Günlük Görevler) grubudur"
-
-    TaskSummary:
-      type: object
-      properties:
-        number:
-          type: integer
-          description: "Liste sırası (1'den başlar)"
-        id:
-          type: string
-          format: uuid
-        title:
-          type: string
-        description:
-          type: string
-        status:
-          type: string
-          enum: [pending, completed, blocked]
-        block_reason:
-          type: string
-        subtasks:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-              title:
-                type: string
-              status:
-                type: string
