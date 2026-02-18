@@ -15,6 +15,21 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+// Resolve user's personal group (all tasks are group-owned since migration 006)
+async function resolveOwner(groupId) {
+  if (groupId) return { ownerId: groupId, ownerType: "group" };
+
+  const { data } = await supabase
+    .from("groups")
+    .select("id")
+    .eq("created_by", TODO_USER_ID)
+    .eq("is_personal", true)
+    .maybeSingle();
+
+  if (!data) throw new Error("Kişisel grup bulunamadı. TODO_USER_ID doğru mu?");
+  return { ownerId: data.id, ownerType: "group" };
+}
+
 // Helper: format date as YYYY-MM-DD
 function formatDate(dateStr) {
   if (!dateStr || dateStr === "today") {
@@ -41,13 +56,11 @@ server.tool(
   "Belirli bir tarihteki görevleri listele",
   {
     date: z.string().optional().describe("Tarih (YYYY-MM-DD, 'today', veya 'tomorrow'). Varsayılan: today"),
-    owner_id: z.string().optional().describe("Owner ID (user veya group ID). Varsayılan: kişisel"),
-    owner_type: z.enum(["user", "group"]).optional().describe("Owner tipi. Varsayılan: user"),
+    group_id: z.string().optional().describe("Grup ID'si. Belirtilmezse kişisel grup kullanılır."),
   },
-  async ({ date, owner_id, owner_type }) => {
+  async ({ date, group_id }) => {
     const dateStr = formatDate(date);
-    const ownerId = owner_id || TODO_USER_ID;
-    const ownerType = owner_type || "user";
+    const { ownerId, ownerType } = await resolveOwner(group_id);
 
     const { data: tasks, error } = await supabase
       .from("tasks")
@@ -88,13 +101,11 @@ server.tool(
     title: z.string().describe("Görev başlığı. Birden fazla görev için virgülle ayır: 'Market, Çamaşır, Fatura öde'"),
     date: z.string().optional().describe("Tarih (YYYY-MM-DD, 'today', 'tomorrow'). Varsayılan: today"),
     description: z.string().optional().describe("Açıklama. Alt görevler için her satırı '* ' ile başlat"),
-    owner_id: z.string().optional().describe("Owner ID. Varsayılan: kişisel"),
-    owner_type: z.enum(["user", "group"]).optional().describe("Owner tipi. Varsayılan: user"),
+    group_id: z.string().optional().describe("Grup ID'si. Belirtilmezse kişisel grup kullanılır."),
   },
-  async ({ title, date, description, owner_id, owner_type }) => {
+  async ({ title, date, description, group_id }) => {
     const dateStr = formatDate(date);
-    const ownerId = owner_id || TODO_USER_ID;
-    const ownerType = owner_type || "user";
+    const { ownerId, ownerType } = await resolveOwner(group_id);
 
     // Support multiple tasks separated by comma
     const titles = title.split(",").map((t) => t.trim()).filter(Boolean);
@@ -219,16 +230,14 @@ server.tool(
     task_number: z.number().optional().describe("Görev sıra numarası (1'den başlar)"),
     task_id: z.string().optional().describe("Görev ID'si"),
     date: z.string().optional().describe("Tarih. Varsayılan: today"),
-    owner_id: z.string().optional().describe("Owner ID"),
-    owner_type: z.enum(["user", "group"]).optional(),
+    group_id: z.string().optional().describe("Grup ID'si. Belirtilmezse kişisel grup kullanılır."),
   },
-  async ({ task_number, task_id, date, owner_id, owner_type }) => {
+  async ({ task_number, task_id, date, group_id }) => {
     let targetId = task_id;
 
     if (!targetId && task_number) {
       const dateStr = formatDate(date);
-      const ownerId = owner_id || TODO_USER_ID;
-      const ownerType = owner_type || "user";
+      const { ownerId, ownerType } = await resolveOwner(group_id);
 
       const { data: tasks } = await supabase
         .from("tasks")
