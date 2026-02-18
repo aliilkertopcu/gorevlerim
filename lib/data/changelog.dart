@@ -15,6 +15,14 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.21.2',
+    date: '2026-02-18',
+    fixes: [
+      'Custom GPT entegrasyonu düzeltildi — her kullanıcı kendi API anahtarıyla bağlanabilir',
+      'Edge function JWT doğrulama sorunu giderildi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.21.1',
     date: '2026-02-18',
     fixes: [
