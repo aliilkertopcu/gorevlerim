@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/task_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import 'desktop_dialog.dart';
+
+const _chatGptUrl = 'https://chatgpt.com/g/g-698064fcef40819193c8d429b724f1b1-gorevlerim';
 
 class TaskForm extends ConsumerWidget {
   const TaskForm({super.key});
@@ -17,6 +20,10 @@ class TaskForm extends ConsumerWidget {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () => _showAddTaskDialog(context, ref),
+        onLongPress: () => launchUrl(
+          Uri.parse(_chatGptUrl),
+          mode: LaunchMode.externalApplication,
+        ),
         icon: const Icon(Icons.add),
         label: const Text('Yeni Görev Ekle'),
         style: ElevatedButton.styleFrom(
