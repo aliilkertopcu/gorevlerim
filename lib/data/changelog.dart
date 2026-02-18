@@ -15,6 +15,15 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.22.0',
+    date: '2026-02-18',
+    features: [
+      'ChatGPT OAuth bağlantısı — kopyala-yapıştır olmadan tek tıkla bağlan',
+      'gpt-auth, gpt-oauth Supabase edge fonksiyonları eklendi',
+      'todo-api Bearer token desteği eklendi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.21.2',
     date: '2026-02-18',
     fixes: [
