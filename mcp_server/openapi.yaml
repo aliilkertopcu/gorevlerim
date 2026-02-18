@@ -2,19 +2,32 @@ openapi: 3.1.0
 info:
   title: Görevlerim API
   description: |
-    Kişisel görev yönetimi için API. Her kullanıcı kendi api_key'ini sağlar.
-    api_key, Görevlerim uygulamasının ayarlar ekranından elde edilir.
+    Kişisel görev yönetimi için API.
 
     Tarih formatları:
     - "today" veya "bugün" → bugünün tarihi
     - "tomorrow" veya "yarın" → yarının tarihi
     - "yesterday" veya "dün" → dünün tarihi
     - "YYYY-MM-DD" → belirli tarih
-  version: 3.2.0
+  version: 4.0.0
 
 servers:
   - url: https://njzmorqwcsdnjjtvvmgd.supabase.co/functions/v1/todo-api
     description: Supabase Edge Function
+
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://aliilkertopcu.github.io/gorevlerim/#/gpt-connect
+          tokenUrl: https://njzmorqwcsdnjjtvvmgd.supabase.co/functions/v1/gpt-oauth
+          scopes:
+            tasks: Görevlere okuma ve yazma erişimi
+
+security:
+  - OAuth2: [tasks]
 
 paths:
   /groups:
@@ -22,13 +35,6 @@ paths:
       operationId: listGroups
       summary: Grupları listele
       description: Kullanıcının üye olduğu tüm grupları listeler (kişisel grup dahil)
-      parameters:
-        - name: api_key
-          in: query
-          required: true
-          schema:
-            type: string
-          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
       responses:
         "200":
           description: Grup listesi
@@ -57,12 +63,6 @@ paths:
       summary: Görevleri listele
       description: Belirli bir tarihteki tüm görevleri alt görevleriyle birlikte getirir.
       parameters:
-        - name: api_key
-          in: query
-          required: true
-          schema:
-            type: string
-          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
         - name: date
           in: query
           schema:
@@ -123,13 +123,6 @@ paths:
         - Tek görev: title alanını kullan
         - Çoklu görev: virgülle ayır ("market, fatura, spor") veya titles array kullan
         - Alt görevler: description içinde "* " ile başlayan satırlar veya subtasks array
-      parameters:
-        - name: api_key
-          in: query
-          required: true
-          schema:
-            type: string
-          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
       requestBody:
         required: true
         content:
@@ -184,13 +177,6 @@ paths:
       operationId: completeTask
       summary: Görevi tamamla (numara ile)
       description: Listede görünen sıra numarasına göre görevi tamamlar
-      parameters:
-        - name: api_key
-          in: query
-          required: true
-          schema:
-            type: string
-          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
       requestBody:
         required: true
         content:
@@ -225,13 +211,6 @@ paths:
       operationId: postponeTask
       summary: Görevi ertele (numara ile)
       description: Görevi başka bir tarihe erteler
-      parameters:
-        - name: api_key
-          in: query
-          required: true
-          schema:
-            type: string
-          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
       requestBody:
         required: true
         content:
@@ -271,12 +250,6 @@ paths:
       operationId: updateTask
       summary: Görevi güncelle (ID ile)
       parameters:
-        - name: api_key
-          in: query
-          required: true
-          schema:
-            type: string
-          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
         - name: task_id
           in: path
           required: true
@@ -308,12 +281,6 @@ paths:
       operationId: deleteTask
       summary: Görevi sil (ID ile)
       parameters:
-        - name: api_key
-          in: query
-          required: true
-          schema:
-            type: string
-          description: "Görevlerim uygulamasından alınan kişisel API anahtarı"
         - name: task_id
           in: path
           required: true
