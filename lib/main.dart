@@ -21,7 +21,7 @@ class WebScrollBehavior extends MaterialScrollBehavior {
   };
 }
 
-const supabaseUrl = 'https://njzmorqwcsdnjjtvvmgd.supabase.co';
+const supabaseUrl = 'https://api.aitopcu.com';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qem1vcnF3Y3NkbmpqdHZ2bWdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MzQ3NDAsImV4cCI6MjA4NTExMDc0MH0.t60ltjH8_M6bwoJGrSb7DuKS3WK_vX8EEMeST16wdMo';
 
 Future<void> main() async {
