@@ -19,7 +19,7 @@ jobs:
         run: flutter pub get
 
       - name: Build web
-        run: flutter build web --release --base-href "/"
+        run: flutter build web --release --base-href "/tasks/"
 
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.9.0
