@@ -15,6 +15,13 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.25.0',
+    date: '2026-02-22',
+    features: [
+      'Supabase trafiği api.aitopcu.com üzerinden geçiyor — rastgele Supabase URL\'i gizlendi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.24.0',
     date: '2026-02-22',
     features: [
