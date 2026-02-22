@@ -15,6 +15,31 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.23.0',
+    date: '2026-02-22',
+    features: [
+      'Görev içi sohbet — her göreve yorum/mesaj eklenebilir, gerçek zamanlı iletişim',
+      'Yazıyor göstergesi — grup görevlerinde başkası yazarken animasyonlu nokta göstergesi',
+      'Alt görevler arası sürükleme — alt görevi farklı bir göreve taşıyabilirsin',
+      'Görev metnine uzun basarak sürükleme — drag handle ikonu kaldırıldı',
+      'Alt görev metnine uzun basarak sürükleme — drag handle ikonu kaldırıldı',
+      'Görev ve alt görev sürüklerken sayfa otomatik scroll eder',
+      'Alt görev ekleme butonu — görev genişletildiğinde altta çıkar',
+      'Görevi farklı listeye taşı — ⋮ menüsünden başka bir listeye gönder',
+      'Geçmiş günlerin görevleri bugünün altında ve katlanabilir olarak gösterilir',
+      'URL\'den grup ve tarih parametresi okunuyor — doğrudan link paylaşımı desteklenir',
+      '"Yeni Görev Ekle" butonuna uzun basınca ChatGPT açılır',
+      'Menü ve grup yönetiminde "Grup" yerine "Liste" terminolojisi',
+      'Mobil dialog: ekranın %85\'iyle sınırlı, içerik kaydırılabilir, butonlar sabit',
+    ],
+    fixes: [
+      'Scroll hatası düzeltildi (_DraggableSubtaskList ConsumerStatefulWidget\'a dönüştürüldü)',
+      'Her görev için açılan gereksiz Supabase stream abonelikleri kaldırıldı',
+      'Typing indicator kanalları sadece açık ve genişletilmiş grup görevlerinde başlatılıyor',
+      'Menü açılırken yaşanan kasma ve genel yavaşlık giderildi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.22.0',
     date: '2026-02-18',
     features: [

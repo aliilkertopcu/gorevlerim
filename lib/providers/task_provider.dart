@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ignore: depend_on_referenced_packages
 import 'package:riverpod/legacy.dart';
@@ -6,6 +7,9 @@ import '../models/task.dart';
 import '../services/task_service.dart';
 import 'auth_provider.dart';
 import 'group_provider.dart';
+
+/// Holds the home screen's ScrollController so descendants can trigger auto-scroll during drag.
+final homeScrollControllerProvider = StateProvider<ScrollController?>((ref) => null);
 
 final taskServiceProvider = Provider<TaskService>((ref) {
   return TaskService(ref.watch(supabaseProvider));
@@ -218,6 +222,36 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     }).toList();
   }
 
+  /// Optimistic move subtask to another task.
+  /// [insertAt] is the desired index in the target task's subtask list (null = append).
+  void optimisticMoveSubtaskToTask(String sourceTaskId, String subtaskId, String targetTaskId, {int? insertAt}) {
+    _markOptimisticUpdate();
+    Subtask? movedSubtask;
+    state = state.map((task) {
+      if (task.id == sourceTaskId) {
+        movedSubtask = task.subtasks.where((s) => s.id == subtaskId).firstOrNull;
+        final remaining = task.subtasks.where((s) => s.id != subtaskId).toList();
+        return task.copyWith(subtasks: remaining);
+      }
+      return task;
+    }).toList();
+    if (movedSubtask != null) {
+      final moved = movedSubtask!.copyWith(taskId: targetTaskId);
+      state = state.map((task) {
+        if (task.id == targetTaskId) {
+          final subs = [...task.subtasks];
+          if (insertAt != null && insertAt <= subs.length) {
+            subs.insert(insertAt, moved);
+          } else {
+            subs.add(moved);
+          }
+          return task.copyWith(subtasks: subs);
+        }
+        return task;
+      }).toList();
+    }
+  }
+
   /// Optimistic reorder subtasks
   void optimisticReorderSubtasks(String taskId, int oldIndex, int newIndex) {
     _markOptimisticUpdate();
@@ -237,6 +271,9 @@ final tasksNotifierProvider = StateNotifierProvider<TasksNotifier, List<Task>>((
   return TasksNotifier();
 });
 
+/// Tracks the subtask currently being dragged for cross-task drag
+final draggingSubtaskProvider = StateProvider<Subtask?>((ref) => null);
+
 /// Stream that syncs server data to local state
 final tasksStreamProvider = StreamProvider.autoDispose<List<Task>>((ref) {
   final taskService = ref.watch(taskServiceProvider);
@@ -248,9 +285,11 @@ final tasksStreamProvider = StreamProvider.autoDispose<List<Task>>((ref) {
     return Stream.value([]);
   }
 
-  // Check group's show_past_incomplete setting
+  // Only show past incomplete tasks when viewing today
+  final now = DateTime.now();
+  final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
   final group = ref.watch(currentGroupProvider);
-  final showPastIncomplete = group?.settings['show_past_incomplete'] as bool? ?? false;
+  final showPastIncomplete = isToday && (group?.settings['show_past_incomplete'] as bool? ?? false);
 
   return taskService
       .streamTasksWithSubtasks(

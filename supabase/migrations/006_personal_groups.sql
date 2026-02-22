@@ -28,26 +28,27 @@ AND NOT EXISTS (
 
 -- 4. Migrate personal tasks to personal groups
 UPDATE tasks
-SET owner_id = g.id::text, owner_type = 'group'
+SET owner_id = g.id, owner_type = 'group'
 FROM groups g
 WHERE tasks.owner_type = 'user'
-  AND tasks.owner_id = g.created_by::text
+  AND tasks.owner_id = g.created_by
   AND g.is_personal = true;
 
 -- 5. Auto-create personal group for new users (trigger)
-CREATE OR REPLACE FUNCTION create_personal_group()
+CREATE OR REPLACE FUNCTION public.create_personal_group()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   new_group_id UUID;
 BEGIN
-  INSERT INTO groups (name, color, created_by, is_personal)
+  INSERT INTO public.groups (name, color, created_by, is_personal)
   VALUES ('Günlük Görevler', '#667eea', NEW.id, true)
   RETURNING id INTO new_group_id;
 
-  INSERT INTO group_members (group_id, user_id)
+  INSERT INTO public.group_members (group_id, user_id)
   VALUES (new_group_id, NEW.id);
 
   RETURN NEW;

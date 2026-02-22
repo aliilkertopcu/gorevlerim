@@ -36,6 +36,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       curve: Curves.easeOut,
     );
     _fadeController.forward();
+    // Auto-fill test credentials on localhost
+    if (Uri.base.host == 'localhost' || Uri.base.host == '127.0.0.1') {
+      _emailController.text = 'deneme2@abc.com';
+      _passwordController.text = '123456';
+    }
   }
 
   @override

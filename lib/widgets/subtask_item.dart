@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/task.dart';
 import '../theme/app_theme.dart';
-import 'custom_drag_listener.dart';
 
 class SubtaskItem extends StatefulWidget {
   final Subtask subtask;
@@ -246,13 +245,6 @@ class _SubtaskItemState extends State<SubtaskItem> {
         ],
       ),
     );
-
-    if (editable) {
-      return CustomDelayDragStartListener(
-        index: subtaskIndex,
-        child: inner,
-      );
-    }
 
     return inner;
   }
