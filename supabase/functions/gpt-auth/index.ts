@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   const clientId = url.searchParams.get("client_id") ?? "";
 
   // Build the Flutter web consent page URL, passing through OAuth params
-  const flutterAppUrl = new URL("https://aliilkertopcu.github.io/gorevlerim/");
+  const flutterAppUrl = new URL("https://aitopcu.com/tasks/");
   flutterAppUrl.hash = `/gpt-connect?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&client_id=${encodeURIComponent(clientId)}`;
 
   return new Response(null, {
