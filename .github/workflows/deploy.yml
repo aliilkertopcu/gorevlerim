@@ -29,11 +29,6 @@ jobs:
       - name: Add server to known hosts
         run: ssh-keyscan -H ${{ secrets.LINODE_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Create web root if needed
-        run: |
-          ssh ${{ secrets.LINODE_USER }}@${{ secrets.LINODE_HOST }} \
-            "sudo mkdir -p /var/www/gorevlerim && sudo chown \$USER:\$USER /var/www/gorevlerim"
-
       - name: Deploy via rsync
         run: |
           rsync -avz --delete build/web/ \
