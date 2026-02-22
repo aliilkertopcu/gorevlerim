@@ -15,6 +15,16 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.24.0',
+    date: '2026-02-22',
+    features: [
+      'aitopcu.com/tasks adresinde yayın — özel domain ile erişim',
+      'HTTPS desteği — Let\'s Encrypt SSL sertifikası',
+      'Nginx reverse proxy — Ghost blog ve uygulama aynı sunucuda',
+      'GitHub Actions ile otomatik deploy — push ile sunucu güncellenir',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.23.0',
     date: '2026-02-22',
     features: [
