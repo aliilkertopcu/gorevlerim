@@ -74,7 +74,7 @@ class TaskService {
                 return false;
               })
               .toList()
-            ..sort((a, b) => (a['sort_order'] as int).compareTo(b['sort_order'] as int));
+            ..sort((a, b) => (b['sort_order'] as int).compareTo(a['sort_order'] as int));
 
           if (filtered.isEmpty) return <Task>[];
 
@@ -136,7 +136,7 @@ class TaskService {
     required String createdBy,
     List<String> subtaskTitles = const [],
   }) async {
-    // Get min sort_order for this date — new tasks go to top
+    // Get max sort_order for this date — new tasks go to top (DESC ordering)
     final existing = await _client
         .from('tasks')
         .select('sort_order')
@@ -144,10 +144,10 @@ class TaskService {
         .eq('owner_type', ownerType)
         .eq('date', _dateKey(date))
         .neq('status', 'deleted')
-        .order('sort_order', ascending: true)
+        .order('sort_order', ascending: false)
         .limit(1);
 
-    final nextOrder = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) - 1000;
+    final nextOrder = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) + 1000;
 
     final taskData = await _client.from('tasks').insert({
       'owner_id': ownerId,
@@ -224,23 +224,35 @@ class TaskService {
 
     final task = Task.fromJson(taskData);
 
-    // Get max sort_order for target date
+    // Get min sort_order for target date — postponed tasks go to bottom (DESC ordering)
     final existing = await _client
         .from('tasks')
         .select('sort_order')
         .eq('owner_id', task.ownerId)
         .eq('owner_type', task.ownerType)
         .eq('date', _dateKey(targetDate))
-        .order('sort_order', ascending: false)
+        .order('sort_order', ascending: true)
         .limit(1);
 
-    final nextOrder = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) + 1;
+    final nextOrder = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) - 1;
 
     await updateTask(taskId, {
       'status': 'pending',
       'date': _dateKey(targetDate),
       'sort_order': nextOrder,
       'postponed_to': null,
+    });
+  }
+
+  /// Move task to a different group/owner (always moves to today)
+  Future<void> moveTaskToGroup(String taskId, String newOwnerId, String newOwnerType) async {
+    final today = DateTime.now();
+    final dateStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    await updateTask(taskId, {
+      'owner_id': newOwnerId,
+      'owner_type': newOwnerType,
+      'date': dateStr,
     });
   }
 
@@ -266,23 +278,23 @@ class TaskService {
       if (newOrderIds.length == 1) {
         newSortOrder = 1000;
       } else if (movedIdx == 0) {
-        // Moved to first - get next task's sort_order
+        // Moved to first — needs highest sort_order (DESC: higher = before)
         final nextTask = await _client
             .from('tasks')
             .select('sort_order')
             .eq('id', newOrderIds[1])
             .single();
         final nextOrder = nextTask['sort_order'] as int;
-        newSortOrder = nextOrder - 1000;
+        newSortOrder = nextOrder + 1000;
       } else if (movedIdx == newOrderIds.length - 1) {
-        // Moved to last - get prev task's sort_order
+        // Moved to last — needs lowest sort_order (DESC: lower = after)
         final prevTask = await _client
             .from('tasks')
             .select('sort_order')
             .eq('id', newOrderIds[movedIdx - 1])
             .single();
         final prevOrder = prevTask['sort_order'] as int;
-        newSortOrder = prevOrder + 1000;
+        newSortOrder = prevOrder - 1000;
       } else {
         // Moved to middle - midpoint between neighbors
         final prevTask = await _client
@@ -324,10 +336,11 @@ class TaskService {
     final now = DateTime.now().toIso8601String();
     final futures = <Future>[];
     for (int i = 0; i < taskIds.length; i++) {
+      // DESC ordering: first item gets highest value
       futures.add(
         _client
             .from('tasks')
-            .update({'sort_order': (i + 1) * 1000, 'updated_at': now})
+            .update({'sort_order': (taskIds.length - i) * 1000, 'updated_at': now})
             .eq('id', taskIds[i]),
       );
     }
@@ -464,6 +477,35 @@ class TaskService {
     } else {
       await _rebalanceAllSubtasks(newOrderIds);
     }
+  }
+
+  /// Move a subtask to a different parent task
+  Future<void> moveSubtaskToTask(String subtaskId, String targetTaskId) async {
+    // Get max sort_order for target task
+    final existing = await _client
+        .from('subtasks')
+        .select('sort_order')
+        .eq('task_id', targetTaskId)
+        .order('sort_order', ascending: false)
+        .limit(1);
+
+    final nextOrder = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) + 1000;
+
+    // Get old task_id to touch it later
+    final old = await _client.from('subtasks').select('task_id').eq('id', subtaskId).single();
+    final oldTaskId = old['task_id'] as String;
+
+    await _client.from('subtasks').update({
+      'task_id': targetTaskId,
+      'sort_order': nextOrder,
+    }).eq('id', subtaskId);
+
+    // Touch both tasks to trigger stream refresh
+    final now = DateTime.now().toIso8601String();
+    await Future.wait([
+      _client.from('tasks').update({'updated_at': now}).eq('id', oldTaskId),
+      _client.from('tasks').update({'updated_at': now}).eq('id', targetTaskId),
+    ]);
   }
 
   Future<void> _rebalanceAllSubtasks(List<String> subtaskIds) async {

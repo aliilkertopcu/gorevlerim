@@ -49,7 +49,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) => HomeScreen(
+          initialGroupId: state.uri.queryParameters['group'],
+          initialDateStr: state.uri.queryParameters['date'],
+        ),
       ),
       GoRoute(
         path: '/login',

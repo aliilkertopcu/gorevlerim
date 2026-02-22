@@ -80,38 +80,42 @@ class _MobileDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Title
-            DefaultTextStyle(
-              style: Theme.of(context).textTheme.titleLarge!,
-              child: title,
-            ),
-            const SizedBox(height: 16),
-            // Scrollable content
-            Flexible(
-              child: SingleChildScrollView(
-                child: content,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: screenHeight * 0.85),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Title
+              DefaultTextStyle(
+                style: Theme.of(context).textTheme.titleLarge!,
+                child: title,
               ),
-            ),
-            // Actions pinned at bottom
-            if (actions.isNotEmpty) ...[
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: actions
-                    .expand((w) => [w, const SizedBox(width: 8)])
-                    .toList()
-                  ..removeLast(),
+              // Scrollable content
+              Flexible(
+                child: SingleChildScrollView(
+                  child: content,
+                ),
               ),
+              // Actions pinned at bottom
+              if (actions.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: actions
+                      .expand((w) => [w, const SizedBox(width: 8)])
+                      .toList()
+                    ..removeLast(),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

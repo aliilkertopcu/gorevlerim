@@ -91,7 +91,7 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
                   const Icon(Icons.group, color: Colors.white),
                   const SizedBox(width: 8),
                   const Text(
-                    'Grup Yönetimi',
+                    'Liste Yönetimi',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -110,7 +110,7 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
             TabBar(
               controller: _tabController,
               tabs: const [
-                Tab(text: 'Gruplarım'),
+                Tab(text: 'Listelerim'),
                 Tab(text: 'Oluştur / Katıl'),
               ],
             ),
@@ -124,7 +124,7 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
                     data: (groups) {
                       if (groups.isEmpty) {
                         return const Center(
-                          child: Text('Henüz bir grubunuz yok'),
+                          child: Text('Henüz bir listeniz yok'),
                         );
                       }
                       return ListView.builder(
@@ -142,7 +142,7 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
                             ),
                             title: Text(group.name),
                             subtitle: group.isPersonal
-                                ? const Text('Kişisel grup')
+                                ? const Text('Kişisel liste')
                                 : Text('Davet kodu: ${group.inviteCode}'),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () {
@@ -162,14 +162,14 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Yeni Grup Oluştur',
+                          'Yeni Liste Oluştur',
                           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                         ),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _groupNameController,
                           decoration: const InputDecoration(
-                            hintText: 'Grup adı (ör. Ev İşleri)',
+                            hintText: 'Liste adı (ör. Ev İşleri)',
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -190,7 +190,7 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
                         const Divider(),
                         const SizedBox(height: 16),
                         const Text(
-                          'Gruba Katıl',
+                          'Listeye Katıl',
                           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                         ),
                         const SizedBox(height: 8),
@@ -238,7 +238,7 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
       _tabController.animateTo(0);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Grup oluşturuldu')),
+          const SnackBar(content: Text('Liste oluşturuldu')),
         );
       }
     } catch (e) {
@@ -270,7 +270,7 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
       _tabController.animateTo(0);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gruba katıldınız')),
+          const SnackBar(content: Text('Listeye katıldınız')),
         );
       }
     } catch (e) {
@@ -646,7 +646,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
             maxLines: 4,
             minLines: 2,
             decoration: const InputDecoration(
-              hintText: 'Grup açıklaması ekleyin...',
+              hintText: 'Liste açıklaması ekleyin...',
               border: OutlineInputBorder(),
             ),
           ),
@@ -742,7 +742,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Grup Rengi',
+          'Liste Rengi',
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 14,
@@ -1307,8 +1307,8 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
 
   String _localizeAction(String action) {
     switch (action) {
-      case 'member_joined': return 'gruba katıldı';
-      case 'member_left': return 'gruptan ayrıldı';
+      case 'member_joined': return 'listeye katıldı';
+      case 'member_left': return 'listeden ayrıldı';
       case 'member_removed': return 'üyeyi çıkardı';
       case 'task_created': return 'görev oluşturdu';
       case 'task_deleted': return 'görevi sildi';
@@ -1326,8 +1326,8 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
       case 'subtask_blocked': return 'alt görevi bloke etti';
       case 'subtask_edited': return 'alt görevi düzenledi';
       case 'subtask_promoted': return 'alt görevi ana görev yaptı';
-      case 'group_name_changed': return 'grup adını değiştirdi';
-      case 'group_color_changed': return 'grup rengini değiştirdi';
+      case 'group_name_changed': return 'liste adını değiştirdi';
+      case 'group_color_changed': return 'liste rengini değiştirdi';
       case 'group_description_changed': return 'açıklamayı güncelledi';
       case 'settings_changed': return 'ayarları güncelledi';
       case 'invite_created': return 'davet oluşturdu';
@@ -1344,7 +1344,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
           onPressed: _isLoading ? null : _confirmDeleteGroup,
           icon: const Icon(Icons.delete_outline, color: Colors.red),
           label: Text(
-            'Grubu Sil',
+            'Listeyi Sil',
             style: TextStyle(color: Colors.red[400]),
           ),
           style: OutlinedButton.styleFrom(
@@ -1359,7 +1359,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
           onPressed: _isLoading ? null : _confirmLeaveGroup,
           icon: Icon(Icons.exit_to_app, color: Colors.orange[700]),
           label: Text(
-            'Gruptan Ayrıl',
+            'Listeden Ayrıl',
             style: TextStyle(color: Colors.orange[700]),
           ),
           style: OutlinedButton.styleFrom(
@@ -1618,7 +1618,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Üyeyi Çıkar'),
-        content: Text('"$name" grubunuzdan çıkarılsın mı?'),
+        content: Text('"$name" listenizden çıkarılsın mı?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1647,7 +1647,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
       await _loadMembers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Üye gruptan çıkarıldı')),
+          const SnackBar(content: Text('Üye listeden çıkarıldı')),
         );
       }
     } catch (e) {
@@ -1665,8 +1665,8 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Grubu Sil'),
-        content: Text('"${widget.group.name}" grubu ve tüm görevleri kalıcı olarak silinecek. Emin misiniz?'),
+        title: const Text('Listeyi Sil'),
+        content: Text('"${widget.group.name}" listesi ve tüm görevleri kalıcı olarak silinecek. Emin misiniz?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1701,7 +1701,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
       widget.onGroupDeleted();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Grup silindi')),
+          const SnackBar(content: Text('Liste silindi')),
         );
       }
     } catch (e) {
@@ -1719,8 +1719,8 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Gruptan Ayrıl'),
-        content: Text('"${widget.group.name}" grubundan ayrılmak istediğinize emin misiniz?'),
+        title: const Text('Listeden Ayrıl'),
+        content: Text('"${widget.group.name}" listenizden ayrılmak istediğinize emin misiniz?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1761,7 +1761,7 @@ class _GroupDetailViewState extends ConsumerState<_GroupDetailView> {
       widget.onGroupDeleted();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gruptan ayrıldınız')),
+          const SnackBar(content: Text('Listeden ayrıldınız')),
         );
       }
     } catch (e) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,7 +16,10 @@ import '../widgets/desktop_dialog.dart';
 import '../version.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  final String? initialGroupId;
+  final String? initialDateStr;
+
+  const HomeScreen({super.key, this.initialGroupId, this.initialDateStr});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -23,6 +27,53 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   double _dragOffset = 0;
+  bool _urlParamsApplied = false;
+  bool _pastTasksCollapsed = false;
+  final ScrollController _scrollController = ScrollController();
+  bool _isDraggingTask = false;
+  Timer? _taskAutoScrollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(homeScrollControllerProvider.notifier).state = _scrollController;
+    });
+  }
+
+  @override
+  void dispose() {
+    _taskAutoScrollTimer?.cancel();
+    ref.read(homeScrollControllerProvider.notifier).state = null;
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _startTaskAutoScroll(double y) {
+    _taskAutoScrollTimer?.cancel();
+    final screenHeight = MediaQuery.of(context).size.height;
+    const zone = 80.0;
+    const maxSpeed = 12.0;
+    double? speed;
+    if (y < zone) {
+      speed = -(1.0 - y / zone) * maxSpeed;
+    } else if (y > screenHeight - zone) {
+      speed = ((y - (screenHeight - zone)) / zone) * maxSpeed;
+    }
+    if (speed == null) return;
+    if (!_scrollController.hasClients) return;
+    final targetSpeed = speed;
+    _taskAutoScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      if (!mounted) { _taskAutoScrollTimer?.cancel(); return; }
+      final pos = _scrollController.position;
+      pos.jumpTo((pos.pixels + targetSpeed).clamp(pos.minScrollExtent, pos.maxScrollExtent));
+    });
+  }
+
+  void _stopTaskAutoScroll() {
+    _taskAutoScrollTimer?.cancel();
+    _taskAutoScrollTimer = null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +83,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // Restore persisted view state (last viewed group) on first build
     ref.watch(viewStateInitProvider);
+
+    // Apply URL params once after viewStateInit
+    if (!_urlParamsApplied) {
+      _urlParamsApplied = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyUrlParams());
+    }
+
+    // Listen for state changes to update URL
+    ref.listen<OwnerContext?>(ownerContextProvider, (_, _) => _updateUrl());
+    ref.listen<DateTime>(selectedDateProvider, (_, _) => _updateUrl());
 
     return Scaffold(
       body: SafeArea(
@@ -101,6 +162,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     } catch (_) {}
                   },
                   child: CustomScrollView(
+              controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
@@ -152,26 +214,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     tooltip: 'Menü',
                                     onSelected: (value) => _onMenuAction(context, value),
                                     itemBuilder: (context) => [
-                                      // OAuth ile otomatik bağlantı kurulduğundan
-                                      // manuel AI Entegrasyonu menüsü artık gerekmiyor.
-                                      // const PopupMenuItem(
-                                      //   value: 'ai',
-                                      //   child: Row(
-                                      //     children: [
-                                      //       Icon(Icons.smart_toy),
-                                      //       SizedBox(width: 12),
-                                      //       Text('AI Entegrasyonu'),
-                                      //     ],
-                                      //   ),
-                                      // ),
-                                      // const PopupMenuDivider(),
                                       const PopupMenuItem(
                                         value: 'groups',
                                         child: Row(
                                           children: [
-                                            Icon(Icons.group),
+                                            Icon(Icons.list_alt),
                                             SizedBox(width: 12),
-                                            Text('Gruplar'),
+                                            Text('Listeler'),
                                           ],
                                         ),
                                       ),
@@ -300,51 +349,75 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   );
                                 }
 
-                                return ReorderableListView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  buildDefaultDragHandles: false,
-                                  itemCount: tasks.length,
-                                  onReorder: (oldIndex, newIndex) {
-                                    if (newIndex > oldIndex) newIndex--;
-                                    ref.read(tasksNotifierProvider.notifier).optimisticReorderTasks(oldIndex, newIndex);
-                                    final movedId = tasks[oldIndex].id;
-                                    final taskIds = tasks.map((t) => t.id).toList();
-                                    taskIds.removeAt(oldIndex);
-                                    taskIds.insert(newIndex, movedId);
-                                    ref.read(taskServiceProvider).reorderTasks(
-                                      taskIds,
-                                      movedTaskId: movedId,
-                                      oldIndex: oldIndex,
-                                      newIndex: newIndex,
-                                    );
-                                  },
-                                  proxyDecorator: (child, index, animation) {
-                                    return AnimatedBuilder(
-                                      animation: animation,
-                                      builder: (context, child) => Transform.scale(
-                                        scale: 1.04,
-                                        child: Opacity(
-                                          opacity: 0.70,
-                                          child: Material(
-                                            elevation: 12,
-                                            borderRadius: BorderRadius.circular(8),
-                                            color: Colors.transparent,
-                                            child: child,
-                                          ),
+                                // Split tasks into past (from previous days) and today's
+                                final selectedDate = ref.watch(selectedDateProvider);
+                                final pastTasks = tasks.where((t) =>
+                                    t.date.isBefore(selectedDate)).toList();
+                                final todayTasks = tasks.where((t) =>
+                                    !t.date.isBefore(selectedDate)).toList();
+
+                                if (pastTasks.isEmpty) {
+                                  // Normal single list (no grouping needed)
+                                  return _buildTaskList(todayTasks);
+                                }
+
+                                // Grouped view: today's tasks first, past tasks below (collapsible)
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    // Today's tasks (no label)
+                                    _buildTaskList(todayTasks),
+                                    // Past tasks section (collapsible)
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap: () => setState(() => _pastTasksCollapsed = !_pastTasksCollapsed),
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.history, size: 14, color: Colors.orange[600]),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Geçmiş günlerden',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.orange[600],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                '${pastTasks.length}',
+                                                style: TextStyle(fontSize: 11, color: Colors.orange[700]),
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            Icon(
+                                              _pastTasksCollapsed ? Icons.expand_more : Icons.expand_less,
+                                              size: 16,
+                                              color: Colors.orange[600],
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      child: child,
-                                    );
-                                  },
-                                  itemBuilder: (context, index) {
-                                    final task = tasks[index];
-                                    return TaskCard(
-                                      key: ValueKey(task.id),
-                                      task: task,
-                                      index: index,
-                                    );
-                                  },
+                                    ),
+                                    if (!_pastTasksCollapsed)
+                                      Column(
+                                        children: pastTasks.asMap().entries.map((entry) {
+                                          return TaskCard(
+                                            key: ValueKey(entry.value.id),
+                                            task: entry.value,
+                                            index: entry.key,
+                                          );
+                                        }).toList(),
+                                      ),
+                                  ],
                                 );
                               },
                               loading: () => const Padding(
@@ -399,13 +472,110 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Widget _buildTaskList(List tasks) {
+    if (tasks.isEmpty) return const SizedBox.shrink();
+    return Listener(
+      onPointerMove: (event) {
+        if (_isDraggingTask) _startTaskAutoScroll(event.position.dy);
+      },
+      onPointerUp: (_) => _stopTaskAutoScroll(),
+      onPointerCancel: (_) => _stopTaskAutoScroll(),
+      child: ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: tasks.length,
+      onReorderStart: (_) => _isDraggingTask = true,
+      onReorderEnd: (_) {
+        _isDraggingTask = false;
+        _stopTaskAutoScroll();
+      },
+      onReorder: (oldIndex, newIndex) {
+        if (newIndex > oldIndex) newIndex--;
+        ref.read(tasksNotifierProvider.notifier).optimisticReorderTasks(oldIndex, newIndex);
+        final movedId = tasks[oldIndex].id as String;
+        final taskIds = tasks.map((t) => t.id as String).toList();
+        taskIds.removeAt(oldIndex);
+        taskIds.insert(newIndex, movedId);
+        ref.read(taskServiceProvider).reorderTasks(
+          taskIds,
+          movedTaskId: movedId,
+          oldIndex: oldIndex,
+          newIndex: newIndex,
+        );
+      },
+      proxyDecorator: (child, index, animation) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) => Transform.scale(
+            scale: 1.04,
+            child: Opacity(
+              opacity: 0.70,
+              child: Material(
+                elevation: 12,
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.transparent,
+                child: child,
+              ),
+            ),
+          ),
+          child: child,
+        );
+      },
+      itemBuilder: (context, index) {
+        final task = tasks[index];
+        return TaskCard(
+          key: ValueKey(task.id),
+          task: task,
+          index: index,
+        );
+      },
+      ),
+    );
+  }
+
+  void _applyUrlParams() {
+    if (!mounted) return;
+
+    if (widget.initialGroupId != null) {
+      final groups = ref.read(userGroupsProvider).value;
+      if (groups != null) {
+        final group = groups.where((g) => g.id == widget.initialGroupId).firstOrNull;
+        if (group != null) {
+          final newOwner = OwnerContext(ownerId: group.id, ownerType: 'group');
+          ref.read(ownerContextProvider.notifier).state = newOwner;
+          ViewStatePersistence.saveOwnerContext(newOwner);
+        }
+      }
+    }
+
+    if (widget.initialDateStr != null) {
+      try {
+        final parts = widget.initialDateStr!.split('-');
+        if (parts.length == 3) {
+          final date = DateTime(
+            int.parse(parts[0]),
+            int.parse(parts[1]),
+            int.parse(parts[2]),
+          );
+          ref.read(selectedDateProvider.notifier).state = date;
+        }
+      } catch (_) {}
+    }
+  }
+
+  void _updateUrl() {
+    if (!mounted) return;
+    final owner = ref.read(ownerContextProvider);
+    final date = ref.read(selectedDateProvider);
+    if (owner == null) return;
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    context.replace('/?group=${owner.ownerId}&date=$dateStr');
+  }
+
   void _onMenuAction(BuildContext context, String action) {
     switch (action) {
-      // case 'ai':
-      //   showDialog(
-      //     context: context,
-      //     builder: (_) => const AISetupDialog(),
-      //   );
       case 'groups':
         showDialog(
           context: context,
