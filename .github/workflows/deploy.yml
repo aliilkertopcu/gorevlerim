@@ -29,6 +29,7 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-agent -a /tmp/ssh-agent.sock > /dev/null
+          export SSH_AUTH_SOCK=/tmp/ssh-agent.sock
           ssh-add ~/.ssh/deploy_key
           echo "SSH_AUTH_SOCK=/tmp/ssh-agent.sock" >> $GITHUB_ENV
 
