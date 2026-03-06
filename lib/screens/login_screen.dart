@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../version.dart';
+import '../theme/animation_constants.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -324,41 +325,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ),
                               const SizedBox(height: 20),
                               // Error
-                              if (_error != null)
-                                Container(
-                                  width: double.infinity,
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: Colors.red.withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.error_outline_rounded,
-                                        size: 18,
-                                        color: Colors.red[400],
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          _error!,
-                                          style: TextStyle(
-                                            color: Colors.red[400],
-                                            fontSize: 13,
+                              ClipRect(
+                                child: AnimatedSize(
+                                  duration: Anim.normal,
+                                  curve: Anim.defaultCurve,
+                                  alignment: Alignment.topCenter,
+                                  child: _error != null
+                                      ? AnimatedOpacity(
+                                          opacity: 1.0,
+                                          duration: Anim.normal,
+                                          child: Container(
+                                            width: double.infinity,
+                                            margin: const EdgeInsets.only(bottom: 16),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                              vertical: 10,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.withValues(alpha: 0.08),
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: Colors.red.withValues(alpha: 0.3),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.error_outline_rounded,
+                                                  size: 18,
+                                                  color: Colors.red[400],
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Text(
+                                                    _error!,
+                                                    style: TextStyle(
+                                                      color: Colors.red[400],
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                        )
+                                      : const SizedBox.shrink(),
                                 ),
+                              ),
                               // Submit
                               SizedBox(
                                 width: double.infinity,

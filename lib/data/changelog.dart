@@ -15,6 +15,27 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.26.0',
+    date: '2026-03-06',
+    features: [
+      'Merkezi animasyon sistemi — Anim sabitleri ile tutarlı süre ve eğriler',
+      'Sayfa geçiş animasyonu — tüm rotalarda fade efektiyle yumuşak geçiş',
+      'Dialog açılış animasyonu — scale+fade efektiyle pürüzsüz açılış',
+      'Görev kartı basma geri bildirimi — dokunulduğunda hafif küçülme efekti',
+      'Görev kartı açılma/kapanma animasyonu — AnimatedSize ile pürüzsüz geçiş',
+      'Checkbox animasyonları — görev ve alt görevlerde durum değişim efekti',
+      'Tarih değiştirme animasyonu — gün seçerken AnimatedSwitcher geçişi',
+      'Sohbet mesajı giriş animasyonu — yeni mesajlar kayarak ve belirerek görünür',
+      'Onboarding giriş animasyonu — içerik fade+slide ile görünür',
+      'Odak modu zamanlayıcı animasyonları — overtime ve renk geçişleri',
+      'Geçmiş görevler bölümü animasyonlu açılır/kapanır',
+    ],
+    fixes: [
+      'RepaintBoundary ile görev kartı çizim performansı iyileştirildi',
+      'Giriş ekranında hata mesajı animasyonlu gösterilir (ani açılma kaldırıldı)',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.25.0',
     date: '2026-02-22',
     features: [

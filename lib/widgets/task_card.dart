@@ -11,6 +11,7 @@ import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import '../providers/chat_provider.dart';
 import '../theme/app_theme.dart';
+import '../theme/animation_constants.dart';
 import 'desktop_dialog.dart';
 import 'subtask_item.dart';
 import 'task_chat.dart';
@@ -109,10 +110,15 @@ class TaskCard extends ConsumerWidget {
           ],
           if (hasExpandableContent) ...[
             const SizedBox(width: 4),
-            Icon(
-              isExpanded ? Icons.expand_less : Icons.expand_more,
-              size: 18,
-              color: ownerColor.withValues(alpha: 0.6),
+            AnimatedRotation(
+              turns: isExpanded ? 0.5 : 0.0,
+              duration: Anim.fast,
+              curve: Anim.defaultCurve,
+              child: Icon(
+                Icons.expand_more,
+                size: 18,
+                color: ownerColor.withValues(alpha: 0.6),
+              ),
             ),
           ],
         ],
@@ -133,7 +139,9 @@ class TaskCard extends ConsumerWidget {
                   // Checkbox
                   GestureDetector(
                       onTap: editable ? () => _toggleComplete(ref) : null,
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: Anim.fast,
+                        curve: Anim.defaultCurve,
                         width: 22,
                         height: 22,
                         decoration: BoxDecoration(
@@ -144,9 +152,12 @@ class TaskCard extends ConsumerWidget {
                           ),
                           color: task.isCompleted ? AppTheme.completedColor : Colors.transparent,
                         ),
-                        child: task.isCompleted
-                            ? const Icon(Icons.check, size: 16, color: Colors.white)
-                            : null,
+                        child: AnimatedSwitcher(
+                          duration: Anim.fast,
+                          child: task.isCompleted
+                              ? const Icon(Icons.check, size: 16, color: Colors.white, key: ValueKey('check'))
+                              : const SizedBox.shrink(key: ValueKey('empty')),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -171,71 +182,83 @@ class TaskCard extends ConsumerWidget {
                 ],
                 ),
               ),
-          // Expandable content
-          if (isExpanded) ...[
-            // Description
-            if (task.description != null && task.description!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(42, 0, 12, 6),
-                child: Text(
-                  task.description!,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ),
-            // Block reason
-            if (task.isBlocked && task.blockReason != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(42, 0, 12, 6),
-                child: Text(
-                  'Sebep: ${task.blockReason}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.blockedColor.withValues(alpha: 0.8),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
-            // Typing indicator — only for group tasks, only when expanded (avoids idle channel overhead)
-            if (isGroupTask)
-              _HeaderTypingIndicator(
-                taskId: task.id,
-                accentColor: ownerColor,
-                currentUserId: ref.watch(currentUserProvider)?.id,
-              ),
-            // Chat panel (below description, above subtasks)
-            if (isChatOpen)
-              TaskChatWidget(
-                taskId: task.id,
-                accentColor: ownerColor,
-              ),
-            // Subtasks
-            if (task.subtasks.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(30, 0, 8, 8),
-                child: _DraggableSubtaskList(
-                  task: task,
-                  accentColor: ownerColor,
-                  editable: editable,
-                  onToggle: (s) => _toggleSubtask(ref, s),
-                  onDelete: (s) => _deleteSubtask(ref, s),
-                  onBlock: (ctx, s) => _blockSubtask(ctx, ref, s),
-                  onUnblock: (s) => _unblockSubtask(ref, s),
-                  onEdit: (ctx, s) => _editSubtask(ctx, ref, s),
-                  onPromote: (s) => _promoteSubtask(ref, s),
-                  onReorder: (oldIdx, newIdx) => _reorderSubtask(ref, oldIdx, newIdx),
-                  onReceiveDrop: (s, at) => _receiveSubtaskDrop(ref, s, insertAt: at),
-                ),
-              ),
-            // Add subtask button
-            if (editable)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(30, 0, 8, 4),
-                child: _AddSubtaskRow(taskId: task.id, accentColor: ownerColor),
-              ),
-          ],
+          // Expandable content with animated size
+          ClipRect(
+            child: AnimatedSize(
+              duration: Anim.normal,
+              curve: Anim.defaultCurve,
+              alignment: Alignment.topCenter,
+              child: isExpanded
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Description
+                        if (task.description != null && task.description!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(42, 0, 12, 6),
+                            child: Text(
+                              task.description!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        // Block reason
+                        if (task.isBlocked && task.blockReason != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(42, 0, 12, 6),
+                            child: Text(
+                              'Sebep: ${task.blockReason}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.blockedColor.withValues(alpha: 0.8),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        // Typing indicator — only for group tasks, only when expanded (avoids idle channel overhead)
+                        if (isGroupTask)
+                          _HeaderTypingIndicator(
+                            taskId: task.id,
+                            accentColor: ownerColor,
+                            currentUserId: ref.watch(currentUserProvider)?.id,
+                          ),
+                        // Chat panel (below description, above subtasks)
+                        if (isChatOpen)
+                          TaskChatWidget(
+                            taskId: task.id,
+                            accentColor: ownerColor,
+                          ),
+                        // Subtasks
+                        if (task.subtasks.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(30, 0, 8, 8),
+                            child: _DraggableSubtaskList(
+                              task: task,
+                              accentColor: ownerColor,
+                              editable: editable,
+                              onToggle: (s) => _toggleSubtask(ref, s),
+                              onDelete: (s) => _deleteSubtask(ref, s),
+                              onBlock: (ctx, s) => _blockSubtask(ctx, ref, s),
+                              onUnblock: (s) => _unblockSubtask(ref, s),
+                              onEdit: (ctx, s) => _editSubtask(ctx, ref, s),
+                              onPromote: (s) => _promoteSubtask(ref, s),
+                              onReorder: (oldIdx, newIdx) => _reorderSubtask(ref, oldIdx, newIdx),
+                              onReceiveDrop: (s, at) => _receiveSubtaskDrop(ref, s, insertAt: at),
+                            ),
+                          ),
+                        // Add subtask button
+                        if (editable)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(30, 0, 8, 4),
+                            child: _AddSubtaskRow(taskId: task.id, accentColor: ownerColor),
+                          ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
         ],
       ),
     );
@@ -243,24 +266,26 @@ class TaskCard extends ConsumerWidget {
     // Always wrap with DragTarget for cross-task subtask drops.
     // onWillAcceptWithDetails filters out same-task drags.
     // No provider update needed during drag — avoids rebuild-during-drag stack overflow.
-    return DragTarget<_SubtaskDragData>(
-      onWillAcceptWithDetails: (details) => details.data.subtask.taskId != task.id,
-      onAcceptWithDetails: (details) {
-        _receiveSubtaskDrop(ref, details.data.subtask);
-      },
-      builder: (context, candidateData, rejectedData) {
-        final isHovering = candidateData.isNotEmpty;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: isHovering
-                ? Border.all(color: ownerColor, width: 2)
-                : null,
-          ),
-          child: cardContent,
-        );
-      },
+    return RepaintBoundary(
+      child: DragTarget<_SubtaskDragData>(
+        onWillAcceptWithDetails: (details) => details.data.subtask.taskId != task.id,
+        onAcceptWithDetails: (details) {
+          _receiveSubtaskDrop(ref, details.data.subtask);
+        },
+        builder: (context, candidateData, rejectedData) {
+          final isHovering = candidateData.isNotEmpty;
+          return AnimatedContainer(
+            duration: Anim.fast,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: isHovering
+                  ? Border.all(color: ownerColor, width: 2)
+                  : null,
+            ),
+            child: cardContent,
+          );
+        },
+      ),
     );
   }
 
@@ -1045,6 +1070,7 @@ class _PressableCard extends StatefulWidget {
 
 class _PressableCardState extends State<_PressableCard> {
   bool _isHovered = false;
+  bool _isPressed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1052,28 +1078,40 @@ class _PressableCardState extends State<_PressableCard> {
         ? Color.lerp(widget.bgColor, Colors.grey, 0.06)!
         : widget.bgColor;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border(
-            left: BorderSide(color: widget.statusColor, width: 4),
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? Anim.pressedScale : 1.0,
+        duration: Anim.fast,
+        curve: Anim.defaultCurve,
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() { _isHovered = false; _isPressed = false; }),
+          child: AnimatedContainer(
+            duration: Anim.fast,
+            curve: Anim.defaultCurve,
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(8),
+              border: Border(
+                left: BorderSide(color: widget.statusColor, width: 4),
+              ),
+              boxShadow: _isHovered
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: widget.child,
           ),
-          boxShadow: _isHovered
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
         ),
-        child: widget.child,
       ),
     );
   }

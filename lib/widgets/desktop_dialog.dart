@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/animation_constants.dart';
 
 /// Shows a dialog that is draggable and resizable on desktop (width > 600),
 /// and a standard AlertDialog on mobile.
@@ -27,9 +28,14 @@ Future<T?> showAppDialog<T>({
   if (!isDesktop) {
     // Mobile: use Dialog with scrollable content to handle keyboard
     if (contentBuilder != null || actionsBuilder != null) {
-      return showDialog<T>(
+      return showGeneralDialog<T>(
         context: context,
-        builder: (ctx) => StatefulBuilder(
+        barrierDismissible: true,
+        barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+        barrierColor: Colors.black54,
+        transitionDuration: Anim.normal,
+        transitionBuilder: _dialogTransition,
+        pageBuilder: (ctx, animation, secondaryAnimation) => StatefulBuilder(
           builder: (ctx, setDialogState) => _MobileDialog(
             title: title,
             content: contentBuilder?.call(ctx, setDialogState) ?? content!,
@@ -38,9 +44,14 @@ Future<T?> showAppDialog<T>({
         ),
       );
     }
-    return showDialog<T>(
+    return showGeneralDialog<T>(
       context: context,
-      builder: (ctx) => _MobileDialog(
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black54,
+      transitionDuration: Anim.normal,
+      transitionBuilder: _dialogTransition,
+      pageBuilder: (ctx, animation, secondaryAnimation) => _MobileDialog(
         title: title,
         content: content!,
         actions: actions ?? [],
@@ -48,10 +59,14 @@ Future<T?> showAppDialog<T>({
     );
   }
 
-  return showDialog<T>(
+  return showGeneralDialog<T>(
     context: context,
+    barrierDismissible: false, // Desktop dialog handles its own dismiss
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black54,
-    builder: (ctx) => _DesktopDialog(
+    transitionDuration: Anim.normal,
+    transitionBuilder: _dialogTransition,
+    pageBuilder: (ctx, animation, secondaryAnimation) => _DesktopDialog(
       title: title,
       content: content,
       actions: actions,
@@ -61,6 +76,22 @@ Future<T?> showAppDialog<T>({
       minWidth: minWidth,
       minHeight: minHeight,
       screenSize: screenSize,
+    ),
+  );
+}
+
+Widget _dialogTransition(
+  BuildContext context,
+  Animation<double> animation,
+  Animation<double> secondaryAnimation,
+  Widget child,
+) {
+  final curved = CurvedAnimation(parent: animation, curve: Anim.defaultCurve);
+  return FadeTransition(
+    opacity: curved,
+    child: ScaleTransition(
+      scale: Tween<double>(begin: 0.9, end: 1.0).animate(curved),
+      child: child,
     ),
   );
 }

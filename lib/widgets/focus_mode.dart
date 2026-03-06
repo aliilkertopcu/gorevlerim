@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/task.dart';
 import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
+import '../theme/animation_constants.dart';
 
 void showFocusMode(BuildContext context, WidgetRef ref, Task task) {
   showDialog(
@@ -243,25 +244,38 @@ class _FocusModeDialogState extends ConsumerState<_FocusModeDialog> {
 
     return Column(
       children: [
-        if (isOvertime)
-          Text(
-            'OVERTIME',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.red[400],
-              letterSpacing: 3,
-            ),
+        ClipRect(
+          child: AnimatedSize(
+            duration: Anim.normal,
+            curve: Anim.defaultCurve,
+            child: isOvertime
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'OVERTIME',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red[400],
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
-        if (isOvertime) const SizedBox(height: 8),
-        Text(
-          isOvertime ? '+${_formatTime(displaySeconds)}' : _formatTime(displaySeconds),
+        ),
+        AnimatedDefaultTextStyle(
+          duration: Anim.slow,
+          curve: Anim.defaultCurve,
           style: TextStyle(
             fontSize: 72,
             fontWeight: FontWeight.w300,
             fontFamily: 'monospace',
             color: timerColor,
             letterSpacing: 4,
+          ),
+          child: Text(
+            isOvertime ? '+${_formatTime(displaySeconds)}' : _formatTime(displaySeconds),
           ),
         ),
         if (_focusState != _FocusState.idle)

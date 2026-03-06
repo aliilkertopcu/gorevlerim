@@ -14,6 +14,7 @@ import '../widgets/group_manager.dart';
 // import '../widgets/ai_setup_dialog.dart'; // OAuth ile otomatik bağlantı kurulduğundan devre dışı
 import '../widgets/desktop_dialog.dart';
 import '../version.dart';
+import '../theme/animation_constants.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final String? initialGroupId;
@@ -174,7 +175,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: Column(
                           children: [
                             // Custom AppBar - same width as content
-                            Container(
+                            AnimatedContainer(
+                              duration: Anim.normal,
+                              curve: Anim.defaultCurve,
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: ownerColor,
@@ -316,10 +319,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               error: (_, _) => const SizedBox.shrink(),
                             ),
                             // Task list content
-                            tasksAsync.when(
+                            AnimatedSwitcher(
+                              duration: Anim.normal,
+                              layoutBuilder: (currentChild, previousChildren) {
+                                return Stack(
+                                  alignment: Alignment.topCenter,
+                                  children: [
+                                    ...previousChildren,
+                                    if (currentChild != null) currentChild,
+                                  ],
+                                );
+                              },
+                              child: tasksAsync.when(
                               data: (tasks) {
                                 if (tasks.isEmpty) {
                                   return Column(
+                                    key: const ValueKey('empty'),
                                     children: [
                                       const SizedBox(height: 80),
                                       Icon(
@@ -358,11 +373,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                                 if (pastTasks.isEmpty) {
                                   // Normal single list (no grouping needed)
-                                  return _buildTaskList(todayTasks);
+                                  return KeyedSubtree(
+                                    key: const ValueKey('data'),
+                                    child: _buildTaskList(todayTasks),
+                                  );
                                 }
 
                                 // Grouped view: today's tasks first, past tasks below (collapsible)
                                 return Column(
+                                  key: const ValueKey('data'),
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
                                     // Today's tasks (no label)
@@ -398,33 +417,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                               ),
                                             ),
                                             const Spacer(),
-                                            Icon(
-                                              _pastTasksCollapsed ? Icons.expand_more : Icons.expand_less,
-                                              size: 16,
-                                              color: Colors.orange[600],
+                                            AnimatedRotation(
+                                              turns: _pastTasksCollapsed ? 0.0 : 0.5,
+                                              duration: Anim.fast,
+                                              curve: Anim.defaultCurve,
+                                              child: Icon(
+                                                Icons.expand_more,
+                                                size: 16,
+                                                color: Colors.orange[600],
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ),
                                     ),
-                                    if (!_pastTasksCollapsed)
-                                      Column(
-                                        children: pastTasks.asMap().entries.map((entry) {
-                                          return TaskCard(
-                                            key: ValueKey(entry.value.id),
-                                            task: entry.value,
-                                            index: entry.key,
-                                          );
-                                        }).toList(),
+                                    ClipRect(
+                                      child: AnimatedSize(
+                                        duration: Anim.normal,
+                                        curve: Anim.defaultCurve,
+                                        alignment: Alignment.topCenter,
+                                        child: _pastTasksCollapsed
+                                            ? const SizedBox.shrink()
+                                            : Column(
+                                                children: pastTasks.asMap().entries.map((entry) {
+                                                  return TaskCard(
+                                                    key: ValueKey(entry.value.id),
+                                                    task: entry.value,
+                                                    index: entry.key,
+                                                  );
+                                                }).toList(),
+                                              ),
                                       ),
+                                    ),
                                   ],
                                 );
                               },
                               loading: () => const Padding(
+                                key: ValueKey('loading'),
                                 padding: EdgeInsets.all(48),
                                 child: Center(child: CircularProgressIndicator()),
                               ),
                               error: (error, _) => Padding(
+                                key: const ValueKey('error'),
                                 padding: const EdgeInsets.all(48),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -441,6 +475,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   ],
                                 ),
                               ),
+                            ),
                             ),
                           ],
                         ),
