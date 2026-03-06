@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/chat_message.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
+import '../theme/animation_constants.dart';
 
 /// Inline chat panel shown inside a task or subtask card.
 /// [taskId] or [subtaskId] must be provided (not both).
@@ -385,7 +386,7 @@ class _TypingDotsState extends State<TypingDotsWidget> with SingleTickerProvider
   }
 }
 
-class _MessageBubble extends StatelessWidget {
+class _MessageBubble extends StatefulWidget {
   final ChatMessage message;
   final bool isMe;
   final Color accentColor;
@@ -397,12 +398,51 @@ class _MessageBubble extends StatelessWidget {
   });
 
   @override
+  State<_MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends State<_MessageBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnim;
+  late final Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Anim.normal,
+    );
+    final curved = CurvedAnimation(parent: _controller, curve: Anim.defaultCurve);
+    _fadeAnim = curved;
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(curved);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final message = widget.message;
+    final isMe = widget.isMe;
+    final accentColor = widget.accentColor;
     final timeStr =
         '${message.createdAt.hour.toString().padLeft(2, '0')}:${message.createdAt.minute.toString().padLeft(2, '0')}';
 
-    return Padding(
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: SlideTransition(
+        position: _slideAnim,
+        child: Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -473,6 +513,8 @@ class _MessageBubble extends StatelessWidget {
           ),
         ],
       ),
+    ),
+    ),
     );
   }
 }

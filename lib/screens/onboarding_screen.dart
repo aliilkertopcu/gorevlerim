@@ -4,11 +4,47 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/changelog.dart';
 import '../version.dart';
 import '../widgets/youtube_embed.dart';
+import '../theme/animation_constants.dart';
 
-class OnboardingScreen extends StatelessWidget {
+class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
+  @override
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with SingleTickerProviderStateMixin {
   static const String _videoId = 'v2gCtEVzm9E';
+
+  late final AnimationController _entranceController;
+  late final Animation<double> _fadeAnim;
+  late final Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: Anim.slow,
+    );
+    final curved = CurvedAnimation(
+      parent: _entranceController,
+      curve: Anim.defaultCurve,
+    );
+    _fadeAnim = curved;
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.05),
+      end: Offset.zero,
+    ).animate(curved);
+    _entranceController.forward();
+  }
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +117,11 @@ class OnboardingScreen extends StatelessWidget {
               ),
               // Scrollable content
               Expanded(
-                child: SingleChildScrollView(
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Center(
                     child: ConstrainedBox(
@@ -208,6 +248,8 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+                ),
                 ),
               ),
             ],

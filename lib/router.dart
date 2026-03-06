@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,6 +9,7 @@ import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/invite_screen.dart';
 import 'screens/gpt_connect_screen.dart';
+import 'theme/animation_constants.dart';
 
 /// Listenable that notifies GoRouter when auth state changes
 class AuthNotifier extends ChangeNotifier {
@@ -49,32 +51,53 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => HomeScreen(
-          initialGroupId: state.uri.queryParameters['group'],
-          initialDateStr: state.uri.queryParameters['date'],
+        pageBuilder: (context, state) => _fadePage(
+          state,
+          HomeScreen(
+            initialGroupId: state.uri.queryParameters['group'],
+            initialDateStr: state.uri.queryParameters['date'],
+          ),
         ),
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => _fadePage(state, const LoginScreen()),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) => _fadePage(state, const OnboardingScreen()),
       ),
       GoRoute(
         path: '/invite/:token',
-        builder: (context, state) => InviteScreen(
-          token: state.pathParameters['token']!,
+        pageBuilder: (context, state) => _fadePage(
+          state,
+          InviteScreen(token: state.pathParameters['token']!),
         ),
       ),
       GoRoute(
         path: '/gpt-connect',
-        builder: (context, state) => GptConnectScreen(
-          redirectUri: state.uri.queryParameters['redirect_uri'] ?? '',
-          oauthState: state.uri.queryParameters['state'] ?? '',
+        pageBuilder: (context, state) => _fadePage(
+          state,
+          GptConnectScreen(
+            redirectUri: state.uri.queryParameters['redirect_uri'] ?? '',
+            oauthState: state.uri.queryParameters['state'] ?? '',
+          ),
         ),
       ),
     ],
   );
 });
+
+CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: Anim.pageTransition,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Anim.enterCurve),
+        child: child,
+      );
+    },
+  );
+}

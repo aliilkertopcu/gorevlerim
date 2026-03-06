@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
 import '../theme/app_theme.dart';
+import '../theme/animation_constants.dart';
 
 class DateNav extends ConsumerWidget {
   const DateNav({super.key});
@@ -52,27 +53,32 @@ class DateNav extends ConsumerWidget {
                   ref.read(selectedDateProvider.notifier).state = picked;
                 }
               },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    dateFormat.format(selectedDate),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: ownerColor,
-                    ),
-                  ),
-                  if (_isToday(selectedDate))
+              child: AnimatedSwitcher(
+                duration: Anim.fast,
+                switchInCurve: Anim.defaultCurve,
+                child: Column(
+                  key: ValueKey(selectedDate),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      'Bugün',
+                      dateFormat.format(selectedDate),
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.grey[400] : Colors.grey,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: ownerColor,
                       ),
                     ),
-                ],
+                    if (_isToday(selectedDate))
+                      Text(
+                        'Bugün',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey[400] : Colors.grey,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

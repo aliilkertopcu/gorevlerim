@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/task.dart';
 import '../theme/app_theme.dart';
+import '../theme/animation_constants.dart';
 
 class SubtaskItem extends StatefulWidget {
   final Subtask subtask;
@@ -131,23 +132,27 @@ class _SubtaskItemState extends State<SubtaskItem> {
     final statusColor = AppTheme.statusColor(subtask.status);
     final blockedColor = AppTheme.blockedColor;
 
-    final inner = Container(
+    final inner = AnimatedContainer(
+      duration: Anim.fast,
+      curve: Anim.defaultCurve,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: subtask.isBlocked
             ? blockedColor.withValues(alpha: 0.08)
-            : null,
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(4),
         border: subtask.isBlocked
             ? Border.all(color: blockedColor.withValues(alpha: 0.25))
-            : null,
+            : Border.all(color: Colors.transparent),
       ),
       child: Row(
         children: [
           // Checkbox
           GestureDetector(
             onTap: editable ? onToggle : null,
-            child: Container(
+            child: AnimatedContainer(
+              duration: Anim.fast,
+              curve: Anim.defaultCurve,
               width: 18,
               height: 18,
               decoration: BoxDecoration(
@@ -166,11 +171,14 @@ class _SubtaskItemState extends State<SubtaskItem> {
                         ? blockedColor.withValues(alpha: 0.15)
                         : Colors.transparent,
               ),
-              child: subtask.isCompleted
-                  ? const Icon(Icons.check, size: 12, color: Colors.white)
-                  : subtask.isBlocked
-                      ? Icon(Icons.block, size: 10, color: blockedColor)
-                      : null,
+              child: AnimatedSwitcher(
+                duration: Anim.fast,
+                child: subtask.isCompleted
+                    ? const Icon(Icons.check, size: 12, color: Colors.white, key: ValueKey('check'))
+                    : subtask.isBlocked
+                        ? Icon(Icons.block, size: 10, color: blockedColor, key: const ValueKey('block'))
+                        : const SizedBox.shrink(key: ValueKey('empty')),
+              ),
             ),
           ),
           const SizedBox(width: 8),
