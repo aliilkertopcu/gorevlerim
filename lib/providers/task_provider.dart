@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ignore: depend_on_referenced_packages
@@ -49,6 +50,8 @@ class TasksNotifier extends StateNotifier<List<Task>> {
       }
       _lastOptimisticUpdate = null;
     }
+    // Skip if data hasn't changed (avoid unnecessary rebuilds)
+    if (listEquals(state, tasks)) return;
     state = tasks;
   }
 
@@ -350,9 +353,11 @@ final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
 
   // If stream has error and no local data, show loading and auto-retry
   if (streamAsync.hasError) {
-    Future.delayed(const Duration(seconds: 2), () {
+    // Schedule retry only once via onDispose guard
+    final retryTimer = Future.delayed(const Duration(seconds: 2), () {
       ref.invalidate(tasksStreamProvider);
     });
+    ref.onDispose(() => retryTimer.ignore());
     return const AsyncValue.loading();
   }
 

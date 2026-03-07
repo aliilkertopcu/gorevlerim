@@ -21,6 +21,20 @@ class Subtask {
   bool get isBlocked => status == 'blocked';
   bool get isPending => status == 'pending';
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Subtask &&
+          id == other.id &&
+          taskId == other.taskId &&
+          title == other.title &&
+          status == other.status &&
+          blockReason == other.blockReason &&
+          sortOrder == other.sortOrder;
+
+  @override
+  int get hashCode => Object.hash(id, taskId, title, status, blockReason, sortOrder);
+
   Subtask copyWith({
     String? id,
     String? taskId,
@@ -122,6 +136,30 @@ class Task {
       subtasks.where((s) => s.isCompleted).length;
 
   int get totalSubtaskCount => subtasks.length;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Task &&
+          id == other.id &&
+          title == other.title &&
+          status == other.status &&
+          description == other.description &&
+          blockReason == other.blockReason &&
+          sortOrder == other.sortOrder &&
+          locked == other.locked &&
+          subtasks.length == other.subtasks.length &&
+          _subtasksEqual(other.subtasks);
+
+  bool _subtasksEqual(List<Subtask> other) {
+    for (int i = 0; i < subtasks.length; i++) {
+      if (subtasks[i] != other[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, title, status, description, blockReason, sortOrder, locked, subtasks.length);
 
   Task copyWith({
     String? id,
