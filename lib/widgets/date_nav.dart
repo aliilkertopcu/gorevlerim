@@ -6,13 +6,14 @@ import '../providers/task_provider.dart';
 import '../theme/app_theme.dart';
 import '../theme/animation_constants.dart';
 
+final _dateFormat = DateFormat('d MMMM yyyy, EEEE', 'tr_TR');
+
 class DateNav extends ConsumerWidget {
   const DateNav({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedDate = ref.watch(selectedDateProvider);
-    final dateFormat = DateFormat('d MMMM yyyy, EEEE', 'tr_TR');
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ownerColor = ref.watch(currentOwnerColorProvider);
 
@@ -61,7 +62,7 @@ class DateNav extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      dateFormat.format(selectedDate),
+                      _dateFormat.format(selectedDate),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,

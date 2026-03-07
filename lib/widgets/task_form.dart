@@ -60,13 +60,7 @@ class TaskForm extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: Image.network(
-              'https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg',
-              width: 24,
-              height: 24,
-              errorBuilder: (_, __, ___) =>
-                  const Icon(Icons.smart_toy, size: 22, color: Colors.white),
-            ),
+            child: const Icon(Icons.smart_toy, size: 22, color: Colors.white),
           ),
         ),
       ],

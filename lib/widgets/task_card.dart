@@ -34,20 +34,18 @@ class TaskCard extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final statusColor = AppTheme.statusColor(task.status);
     final bgColor = AppTheme.statusBackground(task.status, isDark: isDark);
-    final collapsedTasks = ref.watch(collapsedTasksProvider);
-    final isExpanded = !collapsedTasks.contains(task.id);
+    // Use .select() to only rebuild when THIS task's collapsed state changes
+    final isExpanded = !ref.watch(collapsedTasksProvider.select((s) => s.contains(task.id)));
     final hasExpandableContent = task.subtasks.isNotEmpty ||
         (task.description != null && task.description!.isNotEmpty) ||
         (task.isBlocked && task.blockReason != null);
-    final isGroupTask = ref.watch(ownerContextProvider)?.ownerType == 'group';
-    final group = ref.watch(currentGroupProvider);
-    final permissionMode = group?.settings['task_edit_permission'] as String? ?? 'allow';
+    final isGroupTask = ref.watch(ownerContextProvider.select((o) => o?.ownerType == 'group'));
+    final permissionMode = ref.watch(currentGroupProvider.select((g) => g?.settings['task_edit_permission'] as String? ?? 'allow'));
     final editable = canEditTask(ref, task);
     final ownerColor = ref.watch(currentOwnerColorProvider);
 
-    // Chat state
-    final chatOpenTasks = ref.watch(chatOpenTasksProvider);
-    final isChatOpen = chatOpenTasks.contains(task.id);
+    // Use .select() to only rebuild when THIS task's chat state changes
+    final isChatOpen = ref.watch(chatOpenTasksProvider.select((s) => s.contains(task.id)));
 
     // Title row extracted so we can wrap with ReorderableDelayedDragStartListener when editable
     final titleGesture = GestureDetector(
@@ -222,7 +220,7 @@ class TaskCard extends ConsumerWidget {
                           _HeaderTypingIndicator(
                             taskId: task.id,
                             accentColor: ownerColor,
-                            currentUserId: ref.watch(currentUserProvider)?.id,
+                            currentUserId: ref.watch(currentUserProvider.select((u) => u?.id)),
                           ),
                         // Chat panel (below description, above subtasks)
                         if (isChatOpen)

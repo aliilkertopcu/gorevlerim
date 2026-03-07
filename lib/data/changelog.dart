@@ -15,6 +15,21 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.27.0',
+    date: '2026-03-07',
+    features: [],
+    fixes: [
+      'Görev kartı rebuild optimizasyonu — .select() ile sadece ilgili kart yeniden çiziliyor',
+      'Stream deduplication — aynı veri geldiğinde gereksiz rebuild engellendi',
+      'Task/Subtask equality operatörleri eklendi (akıllı karşılaştırma)',
+      'Tek geçişli görev filtreleme — iki .where() yerine tek döngü',
+      'DateFormat önbellekleme — her build\'de yeni nesne oluşturma kaldırıldı',
+      'ChatGPT butonu SVG ağ isteği kaldırıldı, const Icon kullanıldı',
+      'Hata durumunda retry zamanlayıcı birikimi düzeltildi',
+      'Boş görev placeholder\'ı const widget\'a dönüştürüldü',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.26.0',
     date: '2026-03-06',
     features: [

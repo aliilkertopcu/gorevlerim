@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
+import '../models/task.dart';
 import '../providers/task_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/date_nav.dart';
@@ -286,8 +287,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     (t.description != null && t.description!.isNotEmpty) ||
                                     (t.isBlocked && t.blockReason != null));
                                 if (!hasExpandable || tasks.isEmpty) return const SizedBox.shrink();
-                                final collapsed = ref.watch(collapsedTasksProvider);
-                                final allCollapsed = tasks.every((t) => collapsed.contains(t.id));
+                                final taskIds = tasks.map((t) => t.id).toSet();
+                                final allCollapsed = ref.watch(collapsedTasksProvider.select(
+                                    (s) => taskIds.every((id) => s.contains(id))));
                                 return Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton.icon(
@@ -295,8 +297,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       if (allCollapsed) {
                                         ref.read(collapsedTasksProvider.notifier).update({});
                                       } else {
-                                        ref.read(collapsedTasksProvider.notifier).update(
-                                            tasks.map((t) => t.id).toSet());
+                                        ref.read(collapsedTasksProvider.notifier).update(taskIds);
                                       }
                                     },
                                     icon: Icon(
@@ -333,43 +334,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               child: tasksAsync.when(
                               data: (tasks) {
                                 if (tasks.isEmpty) {
-                                  return Column(
-                                    key: const ValueKey('empty'),
-                                    children: [
-                                      const SizedBox(height: 80),
-                                      Icon(
-                                        Icons.task_alt,
-                                        size: 64,
-                                        color: Colors.grey[300],
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'Bu gün için görev yok',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.grey[500],
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Yukarıdan yeni görev ekleyebilirsin',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.grey[400],
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  );
+                                  return const _EmptyTasksPlaceholder();
                                 }
 
                                 // Split tasks into past (from previous days) and today's
                                 final selectedDate = ref.watch(selectedDateProvider);
-                                final pastTasks = tasks.where((t) =>
-                                    t.date.isBefore(selectedDate)).toList();
-                                final todayTasks = tasks.where((t) =>
-                                    !t.date.isBefore(selectedDate)).toList();
+                                // Single-pass partitioning instead of two .where() calls
+                                final pastTasks = <Task>[];
+                                final todayTasks = <Task>[];
+                                for (final t in tasks) {
+                                  if (t.date.isBefore(selectedDate)) {
+                                    pastTasks.add(t);
+                                  } else {
+                                    todayTasks.add(t);
+                                  }
+                                }
 
                                 if (pastTasks.isEmpty) {
                                   // Normal single list (no grouping needed)
@@ -730,6 +709,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _EmptyTasksPlaceholder extends StatelessWidget {
+  const _EmptyTasksPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey('empty'),
+      children: [
+        const SizedBox(height: 80),
+        Icon(Icons.task_alt, size: 64, color: Colors.grey[300]),
+        const SizedBox(height: 16),
+        Text(
+          'Bu gün için görev yok',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey[500], fontSize: 16),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Yukarıdan yeni görev ekleyebilirsin',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey[400], fontSize: 13),
+        ),
+      ],
     );
   }
 }
