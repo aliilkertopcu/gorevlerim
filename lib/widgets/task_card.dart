@@ -15,6 +15,7 @@ import '../theme/animation_constants.dart';
 import 'desktop_dialog.dart';
 import 'subtask_item.dart';
 import 'task_chat.dart';
+import 'task_history.dart';
 
 /// Data payload for draggable subtasks (carries source position for reorder).
 class _SubtaskDragData {
@@ -242,6 +243,7 @@ class TaskCard extends ConsumerWidget {
                               onUnblock: (s) => _unblockSubtask(ref, s),
                               onEdit: (ctx, s) => _editSubtask(ctx, ref, s),
                               onPromote: (s) => _promoteSubtask(ref, s),
+                              onHistory: (s) => showTaskHistoryDialog(context, taskId: task.id, taskTitle: task.title, subtaskId: s.id, subtaskTitle: s.title),
                               onReorder: (oldIdx, newIdx) => _reorderSubtask(ref, oldIdx, newIdx),
                               onReceiveDrop: (s, at) => _receiveSubtaskDrop(ref, s, insertAt: at),
                             ),
@@ -338,6 +340,18 @@ class TaskCard extends ConsumerWidget {
       ),
     ));
 
+    // History option (always available)
+    items.add(const PopupMenuItem(
+      value: 'history',
+      child: Row(
+        children: [
+          Icon(Icons.history, size: 18),
+          SizedBox(width: 8),
+          Text('Geçmiş'),
+        ],
+      ),
+    ));
+
     if (showLockToggle) {
       if (items.isNotEmpty) items.add(const PopupMenuDivider());
       items.add(PopupMenuItem(
@@ -395,6 +409,8 @@ class TaskCard extends ConsumerWidget {
         _toggleLock(ref);
       case 'chat':
         _toggleChat(ref);
+      case 'history':
+        showTaskHistoryDialog(context, taskId: task.id, taskTitle: task.title);
     }
   }
 
@@ -1128,6 +1144,7 @@ class _DraggableSubtaskList extends ConsumerStatefulWidget {
   final void Function(Subtask) onUnblock;
   final void Function(BuildContext, Subtask) onEdit;
   final void Function(Subtask) onPromote;
+  final void Function(Subtask) onHistory;
   final void Function(int oldIndex, int newIndex) onReorder;
   final void Function(Subtask subtask, int insertAt) onReceiveDrop;
 
@@ -1141,6 +1158,7 @@ class _DraggableSubtaskList extends ConsumerStatefulWidget {
     required this.onUnblock,
     required this.onEdit,
     required this.onPromote,
+    required this.onHistory,
     required this.onReorder,
     required this.onReceiveDrop,
   });
@@ -1229,6 +1247,7 @@ class _DraggableSubtaskListState extends ConsumerState<_DraggableSubtaskList> {
             onBlock: () {},
             onEdit: () {},
             onPromote: () {},
+            onHistory: () => widget.onHistory(e.value),
           );
         }).toList(),
       );
@@ -1250,6 +1269,7 @@ class _DraggableSubtaskListState extends ConsumerState<_DraggableSubtaskList> {
           onUnblock: () => widget.onUnblock(subtask),
           onEdit: () => widget.onEdit(context, subtask),
           onPromote: () => widget.onPromote(subtask),
+          onHistory: () => widget.onHistory(subtask),
         );
 
         final draggable = LongPressDraggable<_SubtaskDragData>(
@@ -1281,6 +1301,7 @@ class _DraggableSubtaskListState extends ConsumerState<_DraggableSubtaskList> {
               onBlock: () {},
               onEdit: () {},
               onPromote: () {},
+              onHistory: () {},
             ),
           ),
           onDragStarted: () => HapticFeedback.mediumImpact(),

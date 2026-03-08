@@ -15,6 +15,16 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.28.0',
+    date: '2026-03-08',
+    features: [
+      'Görev & alt görev geçmişi — DB trigger ile otomatik audit trail',
+      'Görev menüsüne "Geçmiş" butonu eklendi — tüm değişiklikleri timeline olarak gösterir',
+      'Alt görev menüsüne "Geçmiş" butonu eklendi — salt okunur modda da görünür',
+      'Oluşturma, tamamlama, bloke etme, düzenleme, taşıma, erteleme, kilitleme — tüm aksiyonlar otomatik loglanıyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.27.0',
     date: '2026-03-07',
     features: [],
