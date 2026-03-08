@@ -6,15 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/task_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
-import '../services/history_service.dart';
 import '../web_utils.dart' if (dart.library.io) '../web_utils_stub.dart';
 import 'desktop_dialog.dart';
 
 const _chatGptUrl = 'https://chatgpt.com/g/g-698064fcef40819193c8d429b724f1b1-gorevlerim';
-
-final _historyServiceProvider = Provider<HistoryService>((ref) {
-  return HistoryService(ref.watch(supabaseProvider));
-});
 
 class TaskForm extends ConsumerWidget {
   const TaskForm({super.key});
@@ -106,7 +101,7 @@ class TaskForm extends ConsumerWidget {
 
         final cleanDesc = descLines.join('\n').trim();
 
-        final createdTask = await ref.read(taskServiceProvider).createTask(
+        await ref.read(taskServiceProvider).createTask(
           ownerId: owner.ownerId,
           ownerType: owner.ownerType,
           date: date,
@@ -114,15 +109,6 @@ class TaskForm extends ConsumerWidget {
           description: cleanDesc.isEmpty ? null : cleanDesc,
           createdBy: user.id,
           subtaskTitles: subtaskTitles,
-        );
-
-        // Log task creation history
-        final userName = user.userMetadata?['display_name'] as String? ?? user.email ?? '?';
-        ref.read(_historyServiceProvider).log(
-          taskId: createdTask.id,
-          userId: user.id,
-          userName: userName,
-          action: 'task_created',
         );
 
         ref.invalidate(tasksStreamProvider);

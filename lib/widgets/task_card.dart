@@ -15,12 +15,6 @@ import '../theme/animation_constants.dart';
 import 'desktop_dialog.dart';
 import 'subtask_item.dart';
 import 'task_chat.dart';
-import 'task_history.dart';
-import '../services/history_service.dart';
-
-final _historyServiceProvider = Provider<HistoryService>((ref) {
-  return HistoryService(ref.watch(supabaseProvider));
-});
 
 /// Data payload for draggable subtasks (carries source position for reorder).
 class _SubtaskDragData {
@@ -248,7 +242,6 @@ class TaskCard extends ConsumerWidget {
                               onUnblock: (s) => _unblockSubtask(ref, s),
                               onEdit: (ctx, s) => _editSubtask(ctx, ref, s),
                               onPromote: (s) => _promoteSubtask(ref, s),
-                              onHistory: (ctx, s) => showTaskHistoryDialog(ctx, ref, taskId: task.id, subtaskId: s.id, title: s.title),
                               onReorder: (oldIdx, newIdx) => _reorderSubtask(ref, oldIdx, newIdx),
                               onReceiveDrop: (s, at) => _receiveSubtaskDrop(ref, s, insertAt: at),
                             ),
@@ -345,18 +338,6 @@ class TaskCard extends ConsumerWidget {
       ),
     ));
 
-    // History option (always available)
-    items.add(const PopupMenuItem(
-      value: 'history',
-      child: Row(
-        children: [
-          Icon(Icons.history, size: 18),
-          SizedBox(width: 8),
-          Text('Geçmiş'),
-        ],
-      ),
-    ));
-
     if (showLockToggle) {
       if (items.isNotEmpty) items.add(const PopupMenuDivider());
       items.add(PopupMenuItem(
@@ -393,9 +374,7 @@ class TaskCard extends ConsumerWidget {
   void _toggleComplete(WidgetRef ref) {
     ref.read(tasksNotifierProvider.notifier).optimisticToggleComplete(task.id);
     ref.read(taskServiceProvider).toggleComplete(task.id, task.isCompleted);
-    final action = task.isCompleted ? 'task_uncompleted' : 'task_completed';
-    _logIfGroupTask(ref, action, '"${task.title}"');
-    _logHistory(ref, action);
+    _logIfGroupTask(ref, task.isCompleted ? 'task_uncompleted' : 'task_completed', '"${task.title}"');
   }
 
   void _onMenuAction(BuildContext context, WidgetRef ref, String action) {
@@ -416,8 +395,6 @@ class TaskCard extends ConsumerWidget {
         _toggleLock(ref);
       case 'chat':
         _toggleChat(ref);
-      case 'history':
-        showTaskHistoryDialog(context, ref, taskId: task.id, title: task.title);
     }
   }
 
@@ -438,9 +415,7 @@ class TaskCard extends ConsumerWidget {
   void _toggleLock(WidgetRef ref) {
     ref.read(tasksNotifierProvider.notifier).optimisticToggleLock(task.id);
     ref.read(taskServiceProvider).toggleTaskLock(task.id, task.locked);
-    final action = task.locked ? 'task_unlocked' : 'task_locked';
-    _logIfGroupTask(ref, action, '"${task.title}"');
-    _logHistory(ref, action);
+    _logIfGroupTask(ref, task.locked ? 'task_unlocked' : 'task_locked', '"${task.title}"');
   }
 
   void _showEditDialog(BuildContext context, WidgetRef ref) {
@@ -495,7 +470,6 @@ class TaskCard extends ConsumerWidget {
       });
 
       _logIfGroupTask(ref, 'task_edited', '"${task.title}"');
-      _logHistory(ref, 'task_edited', details: newTitle != task.title ? '${task.title} → $newTitle' : null);
 
       // Diff subtasks: delete removed, create new, reorder all by text position
       final availableOriginals = [...task.subtasks]; // mutable copy
@@ -608,7 +582,6 @@ class TaskCard extends ConsumerWidget {
       ref.read(tasksNotifierProvider.notifier).optimisticBlockTask(task.id, reason.isEmpty ? null : reason);
       ref.read(taskServiceProvider).blockTask(task.id, reason);
       _logIfGroupTask(ref, 'task_blocked', '"${task.title}"');
-      _logHistory(ref, 'task_blocked', details: reason.isNotEmpty ? reason : null);
     }
 
     showAppDialog(
@@ -658,9 +631,7 @@ class TaskCard extends ConsumerWidget {
       Navigator.pop(context);
       ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
       ref.read(taskServiceProvider).postponeTask(task.id, targetDate);
-      final dateStr = '${targetDate.day.toString().padLeft(2, '0')}.${targetDate.month.toString().padLeft(2, '0')}.${targetDate.year}';
       _logIfGroupTask(ref, 'task_postponed', '"${task.title}"');
-      _logHistory(ref, 'task_postponed', details: dateStr);
     }
 
     void moveToGroup(BuildContext ctx, Group targetGroup) {
@@ -670,7 +641,6 @@ class TaskCard extends ConsumerWidget {
         ref.invalidate(tasksStreamProvider);
       });
       _logIfGroupTask(ref, 'task_moved', '"${task.title}" → "${targetGroup.name}"');
-      _logHistory(ref, 'task_moved', details: '→ ${targetGroup.name}');
     }
 
     showAppDialog(
@@ -703,8 +673,6 @@ class TaskCard extends ConsumerWidget {
                   ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
                   ref.read(taskServiceProvider).postponeTask(task.id, picked);
                   _logIfGroupTask(ref, 'task_postponed', '"${task.title}"');
-                  final ds = '${picked.day.toString().padLeft(2, '0')}.${picked.month.toString().padLeft(2, '0')}.${picked.year}';
-                  _logHistory(ref, 'task_postponed', details: ds);
                 }
               },
             ),
@@ -730,8 +698,6 @@ class TaskCard extends ConsumerWidget {
                   ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
                   ref.read(taskServiceProvider).postponeTask(task.id, picked);
                   _logIfGroupTask(ref, 'task_postponed', '"${task.title}"');
-                  final ds = '${picked.day.toString().padLeft(2, '0')}.${picked.month.toString().padLeft(2, '0')}.${picked.year}';
-                  _logHistory(ref, 'task_postponed', details: ds);
                 }
               },
             ),
@@ -788,7 +754,6 @@ class TaskCard extends ConsumerWidget {
 
   void _deleteTask(WidgetRef ref) {
     _logIfGroupTask(ref, 'task_deleted', '"${task.title}"');
-    _logHistory(ref, 'task_deleted');
     ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
     ref.read(taskServiceProvider).deleteTask(task.id);
   }
@@ -800,23 +765,19 @@ class TaskCard extends ConsumerWidget {
       'block_reason': null,
     });
     _logIfGroupTask(ref, 'task_unblocked', '"${task.title}"');
-    _logHistory(ref, 'task_unblocked');
   }
 
   void _toggleSubtask(WidgetRef ref, Subtask subtask) {
     ref.read(tasksNotifierProvider.notifier).optimisticToggleSubtask(task.id, subtask.id);
     ref.read(taskServiceProvider).toggleSubtaskComplete(subtask.id, subtask.isCompleted);
     ref.read(taskServiceProvider).checkAutoComplete(task.id);
-    final action = subtask.isCompleted ? 'subtask_uncompleted' : 'subtask_completed';
-    _logIfGroupTask(ref, action, '"${subtask.title}"');
-    _logHistory(ref, action, subtaskId: subtask.id, details: subtask.title);
+    _logIfGroupTask(ref, subtask.isCompleted ? 'subtask_uncompleted' : 'subtask_completed', '"${subtask.title}"');
   }
 
   void _deleteSubtask(WidgetRef ref, Subtask subtask) {
     ref.read(tasksNotifierProvider.notifier).optimisticDeleteSubtask(task.id, subtask.id);
     ref.read(taskServiceProvider).deleteSubtask(subtask.id);
     _logIfGroupTask(ref, 'subtask_deleted', '"${subtask.title}"');
-    _logHistory(ref, 'subtask_deleted', subtaskId: subtask.id, details: subtask.title);
   }
 
   void _blockSubtask(BuildContext context, WidgetRef ref, Subtask subtask) {
@@ -828,7 +789,6 @@ class TaskCard extends ConsumerWidget {
       ref.read(tasksNotifierProvider.notifier).optimisticBlockSubtask(task.id, subtask.id, reason.isEmpty ? null : reason);
       ref.read(taskServiceProvider).blockSubtask(subtask.id, reason);
       _logIfGroupTask(ref, 'subtask_blocked', '"${subtask.title}"');
-      _logHistory(ref, 'subtask_blocked', subtaskId: subtask.id, details: reason.isNotEmpty ? reason : subtask.title);
     }
 
     showAppDialog(
@@ -874,7 +834,6 @@ class TaskCard extends ConsumerWidget {
       'block_reason': null,
     });
     _logIfGroupTask(ref, 'subtask_unblocked', '"${subtask.title}"');
-    _logHistory(ref, 'subtask_unblocked', subtaskId: subtask.id, details: subtask.title);
   }
 
   void _editSubtask(BuildContext context, WidgetRef ref, Subtask subtask) {
@@ -886,7 +845,6 @@ class TaskCard extends ConsumerWidget {
       ref.read(tasksNotifierProvider.notifier).optimisticUpdateSubtask(task.id, subtask.id, newTitle);
       ref.read(taskServiceProvider).updateSubtask(subtask.id, {'title': newTitle});
       _logIfGroupTask(ref, 'subtask_edited', '"${subtask.title}"');
-      _logHistory(ref, 'subtask_edited', subtaskId: subtask.id, details: '${subtask.title} → $newTitle');
     }
 
     showAppDialog(
@@ -945,7 +903,6 @@ class TaskCard extends ConsumerWidget {
     );
 
     _logIfGroupTask(ref, 'subtask_promoted', '"${subtask.title}"');
-    _logHistory(ref, 'subtask_promoted', subtaskId: subtask.id, details: subtask.title);
   }
 
   void _moveSubtaskToTask(WidgetRef ref, Subtask subtask, String targetTaskId, {int? insertAt}) {
@@ -970,7 +927,6 @@ class TaskCard extends ConsumerWidget {
       }
     });
     _logIfGroupTask(ref, 'subtask_moved', '"${subtask.title}"');
-    _logHistory(ref, 'subtask_moved', subtaskId: subtask.id, details: subtask.title);
   }
 
   void _receiveSubtaskDrop(WidgetRef ref, Subtask subtask, {int? insertAt}) {
@@ -1000,21 +956,6 @@ class TaskCard extends ConsumerWidget {
     ref.read(groupServiceProvider).logActivity(
       groupId: owner.ownerId,
       userId: user.id,
-      action: action,
-      details: details,
-    );
-  }
-
-  /// Log history event for task/subtask audit trail
-  void _logHistory(WidgetRef ref, String action, {String? subtaskId, String? details}) {
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
-    final userName = user.userMetadata?['display_name'] as String? ?? user.email ?? '?';
-    ref.read(_historyServiceProvider).log(
-      taskId: task.id,
-      subtaskId: subtaskId,
-      userId: user.id,
-      userName: userName,
       action: action,
       details: details,
     );
@@ -1187,7 +1128,6 @@ class _DraggableSubtaskList extends ConsumerStatefulWidget {
   final void Function(Subtask) onUnblock;
   final void Function(BuildContext, Subtask) onEdit;
   final void Function(Subtask) onPromote;
-  final void Function(BuildContext, Subtask) onHistory;
   final void Function(int oldIndex, int newIndex) onReorder;
   final void Function(Subtask subtask, int insertAt) onReceiveDrop;
 
@@ -1201,7 +1141,6 @@ class _DraggableSubtaskList extends ConsumerStatefulWidget {
     required this.onUnblock,
     required this.onEdit,
     required this.onPromote,
-    required this.onHistory,
     required this.onReorder,
     required this.onReceiveDrop,
   });
@@ -1290,7 +1229,6 @@ class _DraggableSubtaskListState extends ConsumerState<_DraggableSubtaskList> {
             onBlock: () {},
             onEdit: () {},
             onPromote: () {},
-            onHistory: () => widget.onHistory(context, e.value),
           );
         }).toList(),
       );
@@ -1312,7 +1250,6 @@ class _DraggableSubtaskListState extends ConsumerState<_DraggableSubtaskList> {
           onUnblock: () => widget.onUnblock(subtask),
           onEdit: () => widget.onEdit(context, subtask),
           onPromote: () => widget.onPromote(subtask),
-          onHistory: () => widget.onHistory(context, subtask),
         );
 
         final draggable = LongPressDraggable<_SubtaskDragData>(

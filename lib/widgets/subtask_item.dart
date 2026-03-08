@@ -15,7 +15,6 @@ class SubtaskItem extends StatefulWidget {
   final VoidCallback? onUnblock;
   final VoidCallback onEdit;
   final VoidCallback onPromote;
-  final VoidCallback? onHistory;
   final bool editable;
 
   const SubtaskItem({
@@ -29,7 +28,6 @@ class SubtaskItem extends StatefulWidget {
     this.onUnblock,
     required this.onEdit,
     required this.onPromote,
-    this.onHistory,
     this.editable = true,
   });
 
@@ -128,7 +126,6 @@ class _SubtaskItemState extends State<SubtaskItem> {
   VoidCallback? get onUnblock => widget.onUnblock;
   VoidCallback get onEdit => widget.onEdit;
   VoidCallback get onPromote => widget.onPromote;
-  VoidCallback? get onHistory => widget.onHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -219,38 +216,24 @@ class _SubtaskItemState extends State<SubtaskItem> {
                 style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600),
               ),
             ),
-          // Menu
-          if (editable || onHistory != null)
+          // Menu (hidden when not editable)
+          if (editable)
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               itemBuilder: (context) => [
-                if (editable) ...[
-                  const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                  PopupMenuItem(
-                    value: subtask.isBlocked ? 'unblock' : 'block',
-                    child: Text(subtask.isBlocked ? 'Blokeyi Kaldır' : 'Bloke Et'),
-                  ),
-                  const PopupMenuItem(value: 'promote', child: Text('Ana Göreve Dönüştür')),
-                ],
-                const PopupMenuItem(
-                  value: 'history',
-                  child: Row(
-                    children: [
-                      Icon(Icons.history, size: 18),
-                      SizedBox(width: 8),
-                      Text('Geçmiş'),
-                    ],
-                  ),
+                const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
+                PopupMenuItem(
+                  value: subtask.isBlocked ? 'unblock' : 'block',
+                  child: Text(subtask.isBlocked ? 'Blokeyi Kaldır' : 'Bloke Et'),
                 ),
-                if (editable) ...[
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Sil', style: TextStyle(color: Colors.red)),
-                  ),
-                ],
+                const PopupMenuItem(value: 'promote', child: Text('Ana Göreve Dönüştür')),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Sil', style: TextStyle(color: Colors.red)),
+                ),
               ],
               onSelected: (value) {
                 switch (value) {
@@ -262,8 +245,6 @@ class _SubtaskItemState extends State<SubtaskItem> {
                     onUnblock?.call();
                   case 'promote':
                     onPromote();
-                  case 'history':
-                    onHistory?.call();
                   case 'delete':
                     onDelete();
                 }

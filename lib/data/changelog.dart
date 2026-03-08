@@ -15,16 +15,6 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
-    version: '0.28.0',
-    date: '2026-03-08',
-    features: [
-      'Görev ve alt görev geçmişi — kim, ne zaman, ne değişiklik yaptı takip ediliyor',
-      'Geçmiş diyaloğu — hamburger menüden her görev ve alt görev için erişilebilir',
-      'Tüm aksiyonlar kaydediliyor: oluşturma, tamamlama, düzenleme, bloke, taşıma, silme',
-      'Zaman çizelgesi görünümü — kullanıcı avatarı, aksiyon ikonu ve tarih bilgisi',
-    ],
-  ),
-  ChangelogEntry(
     version: '0.27.0',
     date: '2026-03-07',
     features: [],
