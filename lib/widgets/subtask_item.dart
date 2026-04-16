@@ -224,54 +224,75 @@ class _SubtaskItemState extends State<SubtaskItem> {
             icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
-            itemBuilder: (context) => [
-              if (editable) ...[
-                const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                PopupMenuItem(
-                  value: subtask.isBlocked ? 'unblock' : 'block',
-                  child: Text(subtask.isBlocked ? 'Blokeyi Kaldır' : 'Bloke Et'),
-                ),
-                const PopupMenuItem(value: 'promote', child: Text('Ana Göreve Dönüştür')),
-              ],
-              const PopupMenuItem(
-                value: 'history',
-                child: Row(
-                  children: [
-                    Icon(Icons.history, size: 18),
-                    SizedBox(width: 8),
-                    Text('Geçmiş'),
-                  ],
-                ),
-              ),
-              if (editable) ...[
-                const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Text('Sil', style: TextStyle(color: Colors.red)),
-                ),
-              ],
-            ],
-            onSelected: (value) {
-              switch (value) {
-                case 'edit':
-                  onEdit();
-                case 'block':
-                  onBlock();
-                case 'unblock':
-                  onUnblock?.call();
-                case 'promote':
-                  onPromote();
-                case 'history':
-                  onHistory();
-                case 'delete':
-                  onDelete();
-              }
-            },
+            itemBuilder: (context) => _buildMenuItems(),
+            onSelected: _onMenuSelected,
           ),
         ],
       ),
     );
 
-    return inner;
+    return GestureDetector(
+      onSecondaryTapDown: (details) =>
+          _showContextMenu(context, details.globalPosition),
+      child: inner,
+    );
+  }
+
+  List<PopupMenuEntry<String>> _buildMenuItems() => [
+        if (editable) ...[
+          const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
+          PopupMenuItem(
+            value: subtask.isBlocked ? 'unblock' : 'block',
+            child: Text(subtask.isBlocked ? 'Blokeyi Kaldır' : 'Bloke Et'),
+          ),
+          const PopupMenuItem(value: 'promote', child: Text('Ana Göreve Dönüştür')),
+        ],
+        const PopupMenuItem(
+          value: 'history',
+          child: Row(children: [
+            Icon(Icons.history, size: 18),
+            SizedBox(width: 8),
+            Text('Geçmiş'),
+          ]),
+        ),
+        if (editable) ...[
+          const PopupMenuDivider(),
+          const PopupMenuItem(
+            value: 'delete',
+            child: Text('Sil', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ];
+
+  void _onMenuSelected(String value) {
+    switch (value) {
+      case 'edit':
+        onEdit();
+      case 'block':
+        onBlock();
+      case 'unblock':
+        onUnblock?.call();
+      case 'promote':
+        onPromote();
+      case 'history':
+        onHistory();
+      case 'delete':
+        onDelete();
+    }
+  }
+
+  void _showContextMenu(BuildContext context, Offset globalPosition) {
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        globalPosition.dx,
+        globalPosition.dy,
+      ),
+      items: _buildMenuItems(),
+    ).then((value) {
+      if (value != null) _onMenuSelected(value);
+    });
   }
 }

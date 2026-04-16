@@ -13,6 +13,7 @@ import '../widgets/task_form.dart';
 import '../widgets/group_selector.dart';
 import '../widgets/group_manager.dart';
 // import '../widgets/ai_setup_dialog.dart'; // OAuth ile otomatik bağlantı kurulduğundan devre dışı
+import '../widgets/connection_banner.dart';
 import '../widgets/desktop_dialog.dart';
 import '../version.dart';
 import '../theme/animation_constants.dart';
@@ -98,7 +99,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: GestureDetector(
+        child: Column(
+          children: [
+            const ConnectionBanner(),
+            Expanded(
+              child: GestureDetector(
           onHorizontalDragUpdate: (details) {
             setState(() {
               _dragOffset += details.delta.dx;
@@ -481,6 +486,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
             ],
           ),
+        ),
+            ),
+          ],
         ),
       ),
     );

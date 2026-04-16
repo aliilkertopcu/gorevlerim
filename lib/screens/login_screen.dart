@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/connection_banner.dart';
 import '../theme/app_theme.dart';
 import '../version.dart';
 import '../theme/animation_constants.dart';
@@ -79,7 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         await ref.read(authServiceProvider).signUpWithEmail(email, password, name);
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = _friendlyError(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -94,10 +95,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     try {
       await ref.read(authServiceProvider).signInWithGoogle();
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = _friendlyError(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String _friendlyError(Object e) {
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('502') ||
+        msg.contains('503') ||
+        msg.contains('network') ||
+        msg.contains('socket') ||
+        msg.contains('connection') ||
+        msg.contains('timeout') ||
+        msg.contains('reach')) {
+      return 'Sunucuya bağlanılamıyor. Lütfen daha sonra tekrar deneyin.';
+    }
+    return e.toString();
   }
 
   @override
@@ -105,7 +120,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: Container(
+      body: Column(
+        children: [
+          const ConnectionBanner(),
+          Expanded(
+            child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -441,6 +460,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
         ),
+      ),
+          ),
+        ],
       ),
     );
   }

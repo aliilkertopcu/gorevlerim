@@ -266,7 +266,10 @@ class TaskCard extends ConsumerWidget {
     // Always wrap with DragTarget for cross-task subtask drops.
     // onWillAcceptWithDetails filters out same-task drags.
     // No provider update needed during drag — avoids rebuild-during-drag stack overflow.
-    return RepaintBoundary(
+    return GestureDetector(
+      onSecondaryTapDown: (details) =>
+          _showContextMenu(context, ref, details.globalPosition),
+      child: RepaintBoundary(
       child: DragTarget<_SubtaskDragData>(
         onWillAcceptWithDetails: (details) => details.data.subtask.taskId != task.id,
         onAcceptWithDetails: (details) {
@@ -286,7 +289,25 @@ class TaskCard extends ConsumerWidget {
           );
         },
       ),
+      ),
     );
+  }
+
+  void _showContextMenu(BuildContext context, WidgetRef ref, Offset globalPosition) {
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        globalPosition.dx,
+        globalPosition.dy,
+      ),
+      items: _buildMenuItems(ref),
+    ).then((value) {
+      if (value != null && context.mounted) {
+        _onMenuAction(context, ref, value);
+      }
+    });
   }
 
   bool _hasLockToggle(WidgetRef ref) {

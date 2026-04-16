@@ -15,6 +15,18 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.29.1',
+    date: '2026-04-16',
+    features: [
+      'Sağ tık ile görev ve alt görev menüsü — mouse konumunda açılıyor',
+      'Sunucu bağlantı hatası banner\'ı — sunucu erişilemez olduğunda kullanıcıya bildirim gösterilir',
+    ],
+    fixes: [
+      'Nginx başlangıç hatası düzeltildi — Supabase upstream DNS çözümlemesi request anına ertelendi',
+      'ChatGPT entegrasyonu devre dışı — yerleşik Whisper AI tabanlı STT ile değiştirilecek',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.28.0',
     date: '2026-03-08',
     features: [

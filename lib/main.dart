@@ -32,8 +32,8 @@ Future<void> main() async {
     anonKey: supabaseAnonKey,
   );
 
-  // Clean URL after OAuth callback (remove ?code=...)
   if (kIsWeb) {
+    suppressContextMenu();
     cleanUrlAfterOAuth();
   }
 

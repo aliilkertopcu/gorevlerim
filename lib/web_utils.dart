@@ -1,5 +1,11 @@
 import 'dart:html' as html;
 
+void suppressContextMenu() {
+  html.document.addEventListener('contextmenu', (html.Event event) {
+    event.preventDefault();
+  });
+}
+
 void cleanUrlAfterOAuth() {
   final uri = Uri.parse(html.window.location.href);
   if (uri.queryParameters.containsKey('code') ||

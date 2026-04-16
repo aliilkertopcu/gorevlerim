@@ -1,4 +1,8 @@
 // Stub for non-web platforms
+void suppressContextMenu() {
+  // No-op on mobile
+}
+
 void cleanUrlAfterOAuth() {
   // No-op on mobile
 }
