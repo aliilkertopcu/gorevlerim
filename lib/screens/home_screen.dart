@@ -14,6 +14,7 @@ import '../widgets/group_selector.dart';
 import '../widgets/group_manager.dart';
 // import '../widgets/ai_setup_dialog.dart'; // OAuth ile otomatik bağlantı kurulduğundan devre dışı
 import '../widgets/connection_banner.dart';
+import '../providers/connection_provider.dart';
 import '../widgets/desktop_dialog.dart';
 import '../version.dart';
 import '../theme/animation_constants.dart';
@@ -96,6 +97,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Listen for state changes to update URL
     ref.listen<OwnerContext?>(ownerContextProvider, (_, _) => _updateUrl());
     ref.listen<DateTime>(selectedDateProvider, (_, _) => _updateUrl());
+
+    // When task stream errors, recheck connection if we currently think we're online
+    ref.listen(tasksStreamProvider, (_, next) {
+      if (next.hasError) {
+        final isOnline = ref.read(connectionProvider).value ?? true;
+        if (isOnline) ref.read(connectionProvider.notifier).retry();
+      }
+    });
 
     return Scaffold(
       body: SafeArea(
