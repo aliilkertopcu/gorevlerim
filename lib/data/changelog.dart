@@ -15,6 +15,14 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.29.2',
+    date: '2026-04-20',
+    fixes: [
+      'Yeni kullanıcı kaydı hatası düzeltildi — görev geçmişi trigger\'ı auth context olmayan durumlarda patlamasın diye güncellendi',
+      'Tarih geçişinde "Geçmiş Günlerden" başlığının anlık görünmesi düzeltildi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.29.1',
     date: '2026-04-16',
     features: [

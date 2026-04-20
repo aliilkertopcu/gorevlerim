@@ -345,9 +345,13 @@ final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
   // Get optimistic local state
   final localTasks = ref.watch(tasksNotifierProvider);
 
-  // If we have local data, use it (optimistic) — even if stream temporarily errors
-  // This prevents flashing an error screen when app resumes from background
-  if (localTasks.isNotEmpty) {
+  // If we have local data AND the stream is settled, use it (optimistic).
+  // Skip when stream is loading: that means the date/owner just changed, and
+  // localTasks still holds the previous context — showing it would briefly flash
+  // yesterday's tasks as "Geçmiş günlerden" before the new stream emits.
+  // When stream is in error state (not loading), keep showing local data so we
+  // don't flash an error screen when the app resumes from background.
+  if (localTasks.isNotEmpty && !streamAsync.isLoading) {
     return AsyncValue.data(localTasks);
   }
 
