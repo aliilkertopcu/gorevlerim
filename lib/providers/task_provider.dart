@@ -59,6 +59,11 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     _lastOptimisticUpdate = DateTime.now();
   }
 
+  /// Accept the next server snapshot immediately (used before a forced refetch).
+  void clearOptimisticWindow() {
+    _lastOptimisticUpdate = null;
+  }
+
   /// Optimistic toggle complete - also updates non-deleted subtasks
   void optimisticToggleComplete(String taskId) {
     _markOptimisticUpdate();
@@ -376,12 +381,13 @@ final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
   final localTasks = ref.watch(tasksNotifierProvider);
 
   // If we have local data AND the stream is settled, use it (optimistic).
-  // Skip when stream is loading: that means the date/owner just changed, and
-  // localTasks still holds the previous context — showing it would briefly flash
-  // yesterday's tasks as "Geçmiş günlerden" before the new stream emits.
+  // Skip when the stream is *reloading* (date/owner changed): localTasks still
+  // holds the previous context and would flash yesterday's tasks. A manual
+  // *refresh* (ref.invalidate after a write) keeps showing local data — no spinner.
   // When stream is in error state (not loading), keep showing local data so we
   // don't flash an error screen when the app resumes from background.
-  if (localTasks.isNotEmpty && !streamAsync.isLoading) {
+  final contextChanging = streamAsync.isLoading && !streamAsync.isRefreshing;
+  if (localTasks.isNotEmpty && !contextChanging) {
     return AsyncValue.data(localTasks);
   }
 
@@ -482,4 +488,11 @@ bool canEditTask(WidgetRef ref, Task task) {
     default:
       return true;
   }
+}
+
+/// Refetch tasks from the server without showing a loading spinner.
+/// Use after writes whose effects the filtered realtime stream may miss (DELETE).
+void refreshTasks(WidgetRef ref) {
+  ref.read(tasksNotifierProvider.notifier).clearOptimisticWindow();
+  ref.invalidate(tasksStreamProvider);
 }

@@ -15,6 +15,13 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.32.1',
+    date: '2026-08-29',
+    fixes: [
+      'Görev ekleme/silme/taşıma sonrası liste yenilenirken spinner çıkmıyor — mevcut liste yerinde kalıyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.32.0',
     date: '2026-08-29',
     features: [

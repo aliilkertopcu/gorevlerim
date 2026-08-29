@@ -319,7 +319,7 @@ class TaskCard extends ConsumerWidget {
     ref.read(tasksNotifierProvider.notifier).optimisticDemoteTask(source.id, task.id);
     ref.read(taskServiceProvider).demoteTaskToSubtask(source.id, task.id).then((_) {
       // Filtered realtime streams don't deliver DELETE events — refetch so the old card disappears.
-      ref.invalidate(tasksStreamProvider);
+      refreshTasks(ref);
     });
     _logIfGroupTask(ref, 'task_demoted', '"${source.title}" -> "${task.title}"');
   }
@@ -388,7 +388,7 @@ class TaskCard extends ConsumerWidget {
         final ids = tasks.map((t) => t.id).toList()..insert(insertAt, created.id);
         await service.rebalanceTasks(ids);
       }
-      ref.invalidate(tasksStreamProvider);
+      refreshTasks(ref);
     });
     _logIfGroupTask(ref, 'subtask_promoted', '"${subtask.title}"');
   }
@@ -893,7 +893,7 @@ class TaskCard extends ConsumerWidget {
     _logIfGroupTask(ref, 'task_deleted', '"${task.title}"');
     ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
     // Filtered realtime streams don't deliver DELETE events — refetch after the server confirms.
-    ref.read(taskServiceProvider).deleteTask(task.id).then((_) => ref.invalidate(tasksStreamProvider));
+    ref.read(taskServiceProvider).deleteTask(task.id).then((_) => refreshTasks(ref));
   }
 
   void _unblockTask(WidgetRef ref) {
