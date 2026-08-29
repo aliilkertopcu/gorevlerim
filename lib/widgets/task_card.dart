@@ -15,14 +15,8 @@ import '../theme/animation_constants.dart';
 import 'desktop_dialog.dart';
 import 'subtask_item.dart';
 import 'task_chat.dart';
+import 'task_drag.dart';
 import 'task_history.dart';
-
-/// Data payload for draggable subtasks (carries source position for reorder).
-class _SubtaskDragData {
-  final Subtask subtask;
-  final int sourceIndex;
-  const _SubtaskDragData({required this.subtask, required this.sourceIndex});
-}
 
 class TaskCard extends ConsumerWidget {
   final Task task;
@@ -48,7 +42,7 @@ class TaskCard extends ConsumerWidget {
     // Use .select() to only rebuild when THIS task's chat state changes
     final isChatOpen = ref.watch(chatOpenTasksProvider.select((s) => s.contains(task.id)));
 
-    // Title row extracted so we can wrap with ReorderableDelayedDragStartListener when editable
+    // Title row: tap toggles expand/collapse. Whole card is the drag handle.
     final titleGesture = GestureDetector(
       onTap: hasExpandableContent
           ? () {
@@ -162,12 +156,7 @@ class TaskCard extends ConsumerWidget {
                     const SizedBox(width: 8),
                     // Title + badges (tap to expand/collapse, long press to drag)
                     Expanded(
-                      child: editable
-                          ? ReorderableDelayedDragStartListener(
-                              index: index,
-                              child: titleGesture,
-                            )
-                          : titleGesture,
+                      child: titleGesture,
                     ),
                   // Menu (hidden when not editable, unless lock toggle is available)
                   if (editable || _hasLockToggle(ref))
@@ -263,34 +252,145 @@ class TaskCard extends ConsumerWidget {
       ),
     );
 
-    // Always wrap with DragTarget for cross-task subtask drops.
-    // onWillAcceptWithDetails filters out same-task drags.
-    // No provider update needed during drag — avoids rebuild-during-drag stack overflow.
+    // Whole card is draggable (desktop: immediate, touch: short hold).
+    final Widget draggableCard = editable
+        ? adaptiveDraggable<TaskDragData>(
+            data: TaskDragData(task: task, sourceIndex: index),
+            feedback: _TaskDragFeedback(task: task, accentColor: ownerColor),
+            childWhenDragging: Opacity(opacity: 0.3, child: cardContent),
+            onDragUpdate: (d) => _taskAutoScroller(ref).update(context, d.globalPosition),
+            onDragEnd: (_) => _taskAutoScroller(ref).stop(),
+            child: cardContent,
+          )
+        : cardContent;
+
     return GestureDetector(
       onSecondaryTapDown: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
       child: RepaintBoundary(
-      child: DragTarget<_SubtaskDragData>(
-        onWillAcceptWithDetails: (details) => details.data.subtask.taskId != task.id,
-        onAcceptWithDetails: (details) {
-          _receiveSubtaskDrop(ref, details.data.subtask);
-        },
-        builder: (context, candidateData, rejectedData) {
-          final isHovering = candidateData.isNotEmpty;
-          return AnimatedContainer(
-            duration: Anim.fast,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: isHovering
-                  ? Border.all(color: ownerColor, width: 2)
-                  : null,
-            ),
-            child: cardContent,
-          );
-        },
-      ),
+        child: TaskDropTarget(
+          task: task,
+          accentColor: ownerColor,
+          onTaskDrop: (data, zone) => _onTaskDrop(ref, data, zone),
+          onSubtaskDrop: (data, zone) => _onSubtaskDrop(ref, data, zone),
+          child: draggableCard,
+        ),
       ),
     );
+  }
+
+  static DragAutoScroller? _scroller;
+  DragAutoScroller _taskAutoScroller(WidgetRef ref) {
+    return _scroller ??= DragAutoScroller(() => ref.read(homeScrollControllerProvider));
+  }
+
+  // ---------- Drop handling ----------
+
+  /// Current visible task list (optimistic state if available).
+  List<Task> _visibleTasks(WidgetRef ref) => ref.read(tasksProvider).value ?? [];
+
+  void _onTaskDrop(WidgetRef ref, TaskDragData data, DropZone zone) {
+    if (!canEditTask(ref, task)) return;
+    if (zone == DropZone.into) {
+      _demoteTask(ref, data.task);
+      return;
+    }
+    final tasks = _visibleTasks(ref);
+    final oldIndex = tasks.indexWhere((t) => t.id == data.task.id);
+    final targetIndex = tasks.indexWhere((t) => t.id == task.id);
+    if (oldIndex < 0 || targetIndex < 0) return;
+    var newIndex = zone == DropZone.before ? targetIndex : targetIndex + 1;
+    if (newIndex > oldIndex) newIndex--;
+    if (newIndex == oldIndex) return;
+
+    ref.read(tasksNotifierProvider.notifier).optimisticReorderTasks(oldIndex, newIndex);
+    final ids = tasks.map((t) => t.id).toList();
+    ids.removeAt(oldIndex);
+    ids.insert(newIndex, data.task.id);
+    ref.read(taskServiceProvider).reorderTasks(
+      ids,
+      movedTaskId: data.task.id,
+      oldIndex: oldIndex,
+      newIndex: newIndex,
+    );
+  }
+
+  void _demoteTask(WidgetRef ref, Task source) {
+    ref.read(tasksNotifierProvider.notifier).optimisticDemoteTask(source.id, task.id);
+    ref.read(taskServiceProvider).demoteTaskToSubtask(source.id, task.id).then((_) {
+      // Filtered realtime streams don't deliver DELETE events — refetch so the old card disappears.
+      ref.invalidate(tasksStreamProvider);
+    });
+    _logIfGroupTask(ref, 'task_demoted', '"${source.title}" -> "${task.title}"');
+  }
+
+  void _onSubtaskDrop(WidgetRef ref, SubtaskDragData data, DropZone zone) {
+    if (!canEditTask(ref, task)) return;
+    if (zone == DropZone.into) {
+      if (data.subtask.taskId == task.id) return;
+      _receiveSubtaskDrop(ref, data.subtask);
+      return;
+    }
+    final tasks = _visibleTasks(ref);
+    final targetIndex = tasks.indexWhere((t) => t.id == task.id);
+    if (targetIndex < 0) return;
+    _promoteSubtaskAt(ref, data.subtask, zone == DropZone.before ? targetIndex : targetIndex + 1);
+  }
+
+  /// Promote a subtask to a task inserted at [insertAt] in the visible list.
+  void _promoteSubtaskAt(WidgetRef ref, Subtask subtask, int insertAt) {
+    final owner = ref.read(ownerContextProvider);
+    final user = ref.read(currentUserProvider);
+    final date = ref.read(selectedDateProvider);
+    if (owner == null || user == null) return;
+
+    final tasks = _visibleTasks(ref);
+    // Tasks are ordered DESC by sort_order (higher = earlier).
+    int sortOrder;
+    bool needsRebalance = false;
+    if (tasks.isEmpty) {
+      sortOrder = 1000;
+    } else if (insertAt <= 0) {
+      sortOrder = tasks.first.sortOrder + 1000;
+    } else if (insertAt >= tasks.length) {
+      sortOrder = tasks.last.sortOrder - 1000;
+    } else {
+      final prev = tasks[insertAt - 1].sortOrder;
+      final next = tasks[insertAt].sortOrder;
+      sortOrder = (prev + next) ~/ 2;
+      needsRebalance = sortOrder == prev || sortOrder == next;
+    }
+
+    final temp = Task(
+      id: 'temp-${subtask.id}',
+      ownerId: owner.ownerId,
+      ownerType: owner.ownerType,
+      date: date,
+      title: subtask.title,
+      sortOrder: sortOrder,
+      createdBy: user.id,
+    );
+    final notifier = ref.read(tasksNotifierProvider.notifier);
+    notifier.optimisticDeleteSubtask(subtask.taskId, subtask.id);
+    notifier.optimisticInsertTask(temp, insertAt);
+
+    final service = ref.read(taskServiceProvider);
+    service.promoteSubtask(
+      subtaskId: subtask.id,
+      taskId: subtask.taskId,
+      ownerId: owner.ownerId,
+      ownerType: owner.ownerType,
+      date: date,
+      createdBy: user.id,
+      sortOrder: sortOrder,
+    ).then((created) async {
+      if (needsRebalance) {
+        final ids = tasks.map((t) => t.id).toList()..insert(insertAt, created.id);
+        await service.rebalanceTasks(ids);
+      }
+      ref.invalidate(tasksStreamProvider);
+    });
+    _logIfGroupTask(ref, 'subtask_promoted', '"${subtask.title}"');
   }
 
   void _showContextMenu(BuildContext context, WidgetRef ref, Offset globalPosition) {
@@ -792,7 +892,8 @@ class TaskCard extends ConsumerWidget {
   void _deleteTask(WidgetRef ref) {
     _logIfGroupTask(ref, 'task_deleted', '"${task.title}"');
     ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
-    ref.read(taskServiceProvider).deleteTask(task.id);
+    // Filtered realtime streams don't deliver DELETE events — refetch after the server confirms.
+    ref.read(taskServiceProvider).deleteTask(task.id).then((_) => ref.invalidate(tasksStreamProvider));
   }
 
   void _unblockTask(WidgetRef ref) {
@@ -1088,6 +1189,47 @@ class _HeaderTypingIndicatorState extends State<_HeaderTypingIndicator> {
 }
 
 /// Hover-effect card wrapper. Shows subtle tint on desktop mouse hover.
+/// Compact floating preview shown while dragging a task card.
+class _TaskDragFeedback extends StatelessWidget {
+  final Task task;
+  final Color accentColor;
+  const _TaskDragFeedback({required this.task, required this.accentColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(8),
+      color: Theme.of(context).colorScheme.surface,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        constraints: const BoxConstraints(maxWidth: 280),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border(left: BorderSide(color: accentColor, width: 4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                task.title,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (task.subtasks.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text('${task.subtasks.length} alt', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PressableCard extends StatefulWidget {
   final Widget child;
   final Color bgColor;
@@ -1293,9 +1435,8 @@ class _DraggableSubtaskListState extends ConsumerState<_DraggableSubtaskList> {
           onHistory: () => widget.onHistory(subtask),
         );
 
-        final draggable = LongPressDraggable<_SubtaskDragData>(
-          data: _SubtaskDragData(subtask: subtask, sourceIndex: i),
-          delay: const Duration(milliseconds: 350),
+        final draggable = adaptiveDraggable<SubtaskDragData>(
+          data: SubtaskDragData(subtask: subtask, sourceIndex: i),
           feedback: Material(
             elevation: 6,
             borderRadius: BorderRadius.circular(6),
@@ -1325,13 +1466,12 @@ class _DraggableSubtaskListState extends ConsumerState<_DraggableSubtaskList> {
               onHistory: () {},
             ),
           ),
-          onDragStarted: () => HapticFeedback.mediumImpact(),
           onDragUpdate: _startAutoScroll,
           onDragEnd: (_) => _stopAutoScroll(),
           child: subtaskWidget,
         );
 
-        return DragTarget<_SubtaskDragData>(
+        return DragTarget<SubtaskDragData>(
           key: targetKey,
           onWillAcceptWithDetails: (_) => true,
           onMove: (details) {

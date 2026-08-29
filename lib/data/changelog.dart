@@ -15,6 +15,20 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.32.0',
+    date: '2026-08-29',
+    features: [
+      'Sürükle-bırak yenilendi: görev kartı her yerinden tutulabiliyor; masaüstünde anında, dokunmatikte kısa basışla (180 ms) başlıyor',
+      'Görevi başka bir görevin üstüne bırak → alt görevi olur (kendi alt görevleri de taşınır)',
+      'Alt görevi bir görevin üst/alt kenarına bırak → o konumda ana görev olur',
+      'Bırakma bölgeleri görsel: kenarlarda çizgi, ortada "Alt görev yap" / "Buraya taşı" etiketi',
+    ],
+    fixes: [
+      'Masaüstünde fareyle sayfa kaydırma kaldırıldı (tekerlek/trackpad aynen); sürükleme artık kaydırmayla çakışmıyor',
+      'Silinen görevin ekranda geri gelme ihtimali giderildi (stream yenileme)',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.31.1',
     date: '2026-08-29',
     features: [

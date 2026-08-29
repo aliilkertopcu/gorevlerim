@@ -214,6 +214,36 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     state = tasks;
   }
 
+  /// Optimistic insert of a new task at [index]
+  void optimisticInsertTask(Task task, int index) {
+    _markOptimisticUpdate();
+    final tasks = [...state];
+    tasks.insert(index.clamp(0, tasks.length), task);
+    state = tasks;
+  }
+
+  /// Optimistic demote: task [sourceId] disappears and reappears as a subtask
+  /// (plus its own subtasks) at the end of task [targetId].
+  void optimisticDemoteTask(String sourceId, String targetId) {
+    _markOptimisticUpdate();
+    final source = state.where((t) => t.id == sourceId).firstOrNull;
+    if (source == null) return;
+    final title = (source.description == null || source.description!.trim().isEmpty)
+        ? source.title
+        : '${source.title} — ${source.description!.trim()}';
+    final head = Subtask(
+      id: 'temp-$sourceId',
+      taskId: targetId,
+      title: title,
+      status: source.isCompleted ? 'completed' : 'pending',
+    );
+    state = state.where((t) => t.id != sourceId).map((t) {
+      if (t.id != targetId) return t;
+      final subs = [...t.subtasks, head, ...source.subtasks.map((s) => s.copyWith(taskId: targetId))];
+      return t.copyWith(subtasks: subs);
+    }).toList();
+  }
+
   /// Optimistic toggle lock
   void optimisticToggleLock(String taskId) {
     _markOptimisticUpdate();

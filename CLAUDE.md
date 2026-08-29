@@ -24,7 +24,9 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 - `lib/router.dart` — GoRouter; `/onboarding`, `/invite` auth redirect dışında
 - `lib/providers/` — Riverpod: auth, task (optimistic update + realtime stream), group, chat, connection (15s health check), theme
 - `lib/services/` — Supabase erişim katmanı; `history_service.dart` salt okunur (loglama DB trigger'da)
-- `lib/widgets/task_card.dart` (1500 satır) — en karmaşık widget: subtask düzenleme, sürükleme, sağ tık menü
+- `lib/widgets/task_card.dart` (1600 satır) — en karmaşık widget: subtask düzenleme, sürükleme, sağ tık menü
+- `lib/widgets/task_drag.dart` — sürükle-bırak altyapısı: `adaptiveDraggable` (masaüstü anında / dokunmatik 180 ms), `TaskDropTarget` (üst=öne, alt=arkaya, orta=alt görev yap), otomatik kaydırma. Görev listesi düz `Column`, ReorderableListView kullanılmıyor.
+- Supabase filtreli stream DELETE olaylarını iletmez → silme/indirme/yükseltme sonrası `ref.invalidate(tasksStreamProvider)`
 - `lib/widgets/group_manager.dart` (1800 satır) — liste/grup yönetimi, izinler, davet linkleri, aktivite günlüğü
 - `lib/widgets/desktop_dialog.dart` — kendi dialog sistemi: desktop'ta sürüklenebilir/boyutlanabilir, mobilde klavye uyumlu
 - `lib/widgets/focus_mode.dart` — Pomodoro (15/25/45/60 dk + overtime)

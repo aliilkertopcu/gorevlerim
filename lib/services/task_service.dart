@@ -135,19 +135,24 @@ class TaskService {
     String? description,
     required String createdBy,
     List<String> subtaskTitles = const [],
+    int? sortOrder,
   }) async {
-    // Get max sort_order for this date — new tasks go to top (DESC ordering)
-    final existing = await _client
-        .from('tasks')
-        .select('sort_order')
-        .eq('owner_id', ownerId)
-        .eq('owner_type', ownerType)
-        .eq('date', _dateKey(date))
-        .neq('status', 'deleted')
-        .order('sort_order', ascending: false)
-        .limit(1);
-
-    final nextOrder = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) + 1000;
+    int nextOrder;
+    if (sortOrder != null) {
+      nextOrder = sortOrder;
+    } else {
+      // Get max sort_order for this date — new tasks go to top (DESC ordering)
+      final existing = await _client
+          .from('tasks')
+          .select('sort_order')
+          .eq('owner_id', ownerId)
+          .eq('owner_type', ownerType)
+          .eq('date', _dateKey(date))
+          .neq('status', 'deleted')
+          .order('sort_order', ascending: false)
+          .limit(1);
+      nextOrder = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) + 1000;
+    }
 
     final taskData = await _client.from('tasks').insert({
       'owner_id': ownerId,
@@ -521,14 +526,16 @@ class TaskService {
     await Future.wait(futures);
   }
 
-  /// Promote subtask to main task
-  Future<void> promoteSubtask({
+  /// Promote subtask to main task. [sortOrder] places it at a specific
+  /// position (tasks are ordered DESC: higher = earlier); null = top.
+  Future<Task> promoteSubtask({
     required String subtaskId,
     required String taskId,
     required String ownerId,
     required String ownerType,
     required DateTime date,
     required String createdBy,
+    int? sortOrder,
   }) async {
     final subtaskData = await _client
         .from('subtasks')
@@ -538,18 +545,67 @@ class TaskService {
 
     final subtask = Subtask.fromJson(subtaskData);
 
-    // Create new task
-    await createTask(
+    final task = await createTask(
       ownerId: ownerId,
       ownerType: ownerType,
       date: date,
       title: subtask.title,
       createdBy: createdBy,
+      sortOrder: sortOrder,
     );
 
-    // Delete subtask
     await deleteSubtask(subtaskId);
+    return task;
   }
+
+  /// Demote a task into a subtask of [targetTaskId]: the task becomes one
+  /// subtask (description folded into the title), its own subtasks follow it,
+  /// then the task row is deleted.
+  Future<void> demoteTaskToSubtask(String taskId, String targetTaskId) async {
+    final taskData = await _client
+        .from('tasks')
+        .select()
+        .eq('id', taskId)
+        .single();
+    final task = Task.fromJson(taskData);
+    final own = await fetchSubtasks(taskId);
+
+    final existing = await _client
+        .from('subtasks')
+        .select('sort_order')
+        .eq('task_id', targetTaskId)
+        .order('sort_order', ascending: false)
+        .limit(1);
+    var order = existing.isEmpty ? 0 : (existing[0]['sort_order'] as int) + 1000;
+
+    final title = (task.description == null || task.description!.trim().isEmpty)
+        ? task.title
+        : '${task.title} — ${task.description!.trim()}';
+
+    await _client.from('subtasks').insert({
+      'task_id': targetTaskId,
+      'title': title,
+      'status': task.isCompleted ? 'completed' : 'pending',
+      'sort_order': order,
+    });
+
+    for (final s in own) {
+      order += 1000;
+      await _client
+          .from('subtasks')
+          .update({'task_id': targetTaskId, 'sort_order': order})
+          .eq('id', s.id);
+    }
+
+    await _client.from('tasks').delete().eq('id', taskId);
+    await _client
+        .from('tasks')
+        .update({'updated_at': DateTime.now().toIso8601String()})
+        .eq('id', targetTaskId);
+  }
+
+  /// Rebalance sort_order for all tasks in the given (top-to-bottom) order.
+  Future<void> rebalanceTasks(List<String> taskIds) => _rebalanceAllTasks(taskIds);
 
   /// Check subtask states and update parent accordingly
   Future<void> checkAutoComplete(String taskId) async {

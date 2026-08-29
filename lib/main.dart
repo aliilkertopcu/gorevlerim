@@ -11,12 +11,13 @@ import 'providers/theme_provider.dart';
 // Web-only import for URL manipulation
 import 'web_utils.dart' if (dart.library.io) 'web_utils_stub.dart';
 
-/// Custom scroll behavior for web - enables mouse drag scrolling
+/// Custom scroll behavior: touch/stylus drag scrolls; mouse scrolls with the
+/// wheel only (standard web behavior) so mouse drags go to drag-and-drop.
 class WebScrollBehavior extends MaterialScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {
     PointerDeviceKind.touch,
-    PointerDeviceKind.mouse,
+    PointerDeviceKind.stylus,
     PointerDeviceKind.trackpad,
   };
 }

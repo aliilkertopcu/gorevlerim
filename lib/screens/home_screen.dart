@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,8 +32,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _urlParamsApplied = false;
   bool _pastTasksCollapsed = false;
   final ScrollController _scrollController = ScrollController();
-  bool _isDraggingTask = false;
-  Timer? _taskAutoScrollTimer;
 
   @override
   void initState() {
@@ -46,36 +43,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
-    _taskAutoScrollTimer?.cancel();
     ref.read(homeScrollControllerProvider.notifier).state = null;
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _startTaskAutoScroll(double y) {
-    _taskAutoScrollTimer?.cancel();
-    final screenHeight = MediaQuery.of(context).size.height;
-    const zone = 80.0;
-    const maxSpeed = 12.0;
-    double? speed;
-    if (y < zone) {
-      speed = -(1.0 - y / zone) * maxSpeed;
-    } else if (y > screenHeight - zone) {
-      speed = ((y - (screenHeight - zone)) / zone) * maxSpeed;
-    }
-    if (speed == null) return;
-    if (!_scrollController.hasClients) return;
-    final targetSpeed = speed;
-    _taskAutoScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
-      if (!mounted) { _taskAutoScrollTimer?.cancel(); return; }
-      final pos = _scrollController.position;
-      pos.jumpTo((pos.pixels + targetSpeed).clamp(pos.minScrollExtent, pos.maxScrollExtent));
-    });
-  }
-
-  void _stopTaskAutoScroll() {
-    _taskAutoScrollTimer?.cancel();
-    _taskAutoScrollTimer = null;
   }
 
   @override
@@ -504,63 +474,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildTaskList(List tasks) {
     if (tasks.isEmpty) return const SizedBox.shrink();
-    return Listener(
-      onPointerMove: (event) {
-        if (_isDraggingTask) _startTaskAutoScroll(event.position.dy);
-      },
-      onPointerUp: (_) => _stopTaskAutoScroll(),
-      onPointerCancel: (_) => _stopTaskAutoScroll(),
-      child: ReorderableListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      buildDefaultDragHandles: false,
-      itemCount: tasks.length,
-      onReorderStart: (_) => _isDraggingTask = true,
-      onReorderEnd: (_) {
-        _isDraggingTask = false;
-        _stopTaskAutoScroll();
-      },
-      onReorder: (oldIndex, newIndex) {
-        if (newIndex > oldIndex) newIndex--;
-        ref.read(tasksNotifierProvider.notifier).optimisticReorderTasks(oldIndex, newIndex);
-        final movedId = tasks[oldIndex].id as String;
-        final taskIds = tasks.map((t) => t.id as String).toList();
-        taskIds.removeAt(oldIndex);
-        taskIds.insert(newIndex, movedId);
-        ref.read(taskServiceProvider).reorderTasks(
-          taskIds,
-          movedTaskId: movedId,
-          oldIndex: oldIndex,
-          newIndex: newIndex,
-        );
-      },
-      proxyDecorator: (child, index, animation) {
-        return AnimatedBuilder(
-          animation: animation,
-          builder: (context, child) => Transform.scale(
-            scale: 1.04,
-            child: Opacity(
-              opacity: 0.70,
-              child: Material(
-                elevation: 12,
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.transparent,
-                child: child,
-              ),
-            ),
-          ),
-          child: child,
-        );
-      },
-      itemBuilder: (context, index) {
-        final task = tasks[index];
-        return TaskCard(
-          key: ValueKey(task.id),
-          task: task,
-          index: index,
-        );
-      },
-      ),
+    // Cards are their own drag sources / drop targets (see task_drag.dart).
+    return Column(
+      children: [
+        for (var i = 0; i < tasks.length; i++)
+          TaskCard(key: ValueKey(tasks[i].id), task: tasks[i], index: i),
+      ],
     );
   }
 
