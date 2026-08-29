@@ -1,16 +1,27 @@
-# todo_app
+# Görevlerim
 
-A new Flutter project.
+Günlük görev takibi — Flutter (web + Android) ve Supabase.
+Canlı: **https://aitopcu.com/tasks/**
 
-## Getting Started
+## Öne çıkanlar
+- 🎤 **Sesle görev ekleme** — konuş, yapay zeka görev/alt görevlere ayırsın (Groq Whisper + LLM, önizleme ile onay)
+- 👥 Ortak listeler, izinler, davet linkleri, görev içi sohbet, aktivite günlüğü
+- ⏱️ Odak modu (Pomodoro), geçmiş günlerden devreden görevler
+- 🖱️ Sürükle-bırak: sıralama, görev ↔ alt görev dönüşümü
+- 🤖 Claude ile kullanım: `mcp_server/` (kendi API anahtarınla)
 
-This project is a starting point for a Flutter application.
+## Geliştirme
+```bash
+flutter pub get
+flutter run -d chrome
+flutter analyze
+flutter build web --release --base-href "/tasks/"
+flutter build apk --release        # android/key.properties gerekir
+```
+Deploy: `main`'e push → GitHub Actions → Linode (rsync).
 
-A few resources to get you started if this is your first Flutter project:
+Backend (Supabase): `supabase/migrations/` sırayla uygulanır (`npx supabase db push`),
+edge function'lar `npx supabase functions deploy <name> --no-verify-jwt`.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Ayrıntılı mimari, konvansiyonlar ve deploy protokolü: **[CLAUDE.md](CLAUDE.md)**.
+Sürüm geçmişi: `lib/data/changelog.dart` (uygulama içinde "Neler Yeni?").

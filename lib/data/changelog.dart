@@ -15,6 +15,16 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.32.2',
+    date: '2026-08-29',
+    fixes: [
+      'Paket güncellemeleri (Supabase, Riverpod, GoRouter vb. uyumlu son sürümler)',
+      'Web: eski dart:html yerine package:web',
+      'Kullanıcı hesabı silinebilir hale getirildi (görev geçmişi ve grup referansları artık silmeyi engellemiyor)',
+      'Supabase ücretsiz planın uykuya geçmesini önleyen otomatik ping',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.32.1',
     date: '2026-08-29',
     fixes: [

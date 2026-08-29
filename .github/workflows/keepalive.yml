@@ -1,0 +1,24 @@
+name: Supabase keep-alive
+
+# Free-tier Supabase projects pause after ~7 days without API activity.
+# A lightweight authenticated REST call every 3 days keeps the project active.
+
+on:
+  schedule:
+    - cron: "17 6 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://njzmorqwcsdnjjtvvmgd.supabase.co/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "status=$code"
+          # 200 (rows) or 401/403 (RLS, still counts as activity) are fine; 5xx / 000 means down
+          case "$code" in 2*|401|403) exit 0 ;; *) exit 1 ;; esac

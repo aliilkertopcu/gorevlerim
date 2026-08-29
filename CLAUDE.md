@@ -5,7 +5,7 @@ Canlı: https://aitopcu.com/tasks/ (Linode VPS, nginx). Supabase trafiği `https
 
 ## Komutlar
 ```bash
-flutter analyze                      # 5 info-level uyarı normal (web_utils.dart, router.dart, group_manager.dart)
+flutter analyze                      # ~6 info-level uyarı normal (group_manager RadioGroup, anonKey deprecation, null-aware lint)
 flutter run -d chrome                # lokal test
 flutter build web --release --base-href "/tasks/"
 flutter build apk --release          # Android; android/key.properties + app/upload-keystore.jks (gitignored) ile imzalanır
@@ -64,6 +64,8 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 - Testler `test/` altında az (animation_test, widget_test); davranış değişikliğinde `flutter analyze` yeterli sayılıyor
 
 ## Notlar
-- `DEVELOPMENT_LOG.md` eski (GitHub Pages dönemi); güncel gerçek kaynak bu dosya + changelog.dart
+- `DEVELOPMENT_LOG.md` kilometre taşları; güncel gerçek kaynak bu dosya + changelog.dart
+- `.github/workflows/keepalive.yml` 3 günde bir Supabase REST'e ping atar (free tier pause'u önler); secret: `SUPABASE_ANON_KEY`
+- Kullanıcı silme: migration 015/016 ile FK'lar SET NULL, kişisel grup trigger ile silinir (`npx supabase db query --linked "delete from auth.users where email='…'"`)
 - `.claude/settings.local.json` ve `supabase/.temp/` gitignore'da (2026-08-29)
 - Android release imzası: `android/key.properties` + `android/app/upload-keystore.jks` (her ikisi gitignored, yedekle!). `pubspec.yaml` version alanı 1.0.0+1 (uygulama sürümü `lib/version.dart`'ta)
