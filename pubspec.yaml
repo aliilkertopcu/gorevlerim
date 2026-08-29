@@ -44,6 +44,10 @@ dependencies:
     sdk: flutter
   url_launcher: ^6.3.2
   web: ^1.1.0
+  record: ^6.2.1
+  http: ^1.6.0
+  http_parser: ^4.1.2
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

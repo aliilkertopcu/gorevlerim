@@ -15,6 +15,20 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.30.0',
+    date: '2026-08-29',
+    features: [
+      'Sesle görev ekleme 🎤 — mikrofon butonuna basıp yapacaklarını anlat, yapay zeka görev ve alt görevlere ayırsın',
+      'Kaydetmeden önce önizleme: görevleri seç, başlığı düzenle, tarihi değiştir, alt görevleri çıkar',
+      'Konuşmadaki tarihler ("yarın", "cuma", "haftaya") otomatik çözülür; görev olmayan sözler ("köpek yapma") ayıklanır',
+      'Günlük 10 dakika ses kotası — kalan süre dialogda gösterilir',
+      'Arka planda Groq Whisper (Türkçe) + LLM; ChatGPT hesabı ya da API anahtarı gerekmez',
+    ],
+    fixes: [
+      'ChatGPT butonu kaldırıldı (Custom GPT entegrasyonu artık çalışmıyordu)',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.29.2',
     date: '2026-04-20',
     fixes: [

@@ -1,15 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/task_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
-import '../web_utils.dart' if (dart.library.io) '../web_utils_stub.dart';
 import 'desktop_dialog.dart';
-
-const _chatGptUrl = 'https://chatgpt.com/g/g-698064fcef40819193c8d429b724f1b1-gorevlerim';
+import 'voice_task_dialog.dart';
 
 class TaskForm extends ConsumerWidget {
   const TaskForm({super.key});
@@ -37,30 +33,24 @@ class TaskForm extends ConsumerWidget {
           ),
         ),
         const SizedBox(width: 8),
-        // ChatGPT butonu
+        // Sesle görev ekle
         SizedBox(
           height: 48,
           width: 48,
-          child: ElevatedButton(
-            onPressed: () {
-              if (kIsWeb) {
-                openUrl(_chatGptUrl);
-              } else {
-                launchUrl(
-                  Uri.parse(_chatGptUrl),
-                  mode: LaunchMode.externalApplication,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF000000),
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          child: Tooltip(
+            message: 'Sesle görev ekle',
+            child: ElevatedButton(
+              onPressed: () => showVoiceTaskDialog(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ownerColor,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
+              child: const Icon(Icons.mic, size: 24, color: Colors.white),
             ),
-            child: const Icon(Icons.smart_toy, size: 22, color: Colors.white),
           ),
         ),
       ],

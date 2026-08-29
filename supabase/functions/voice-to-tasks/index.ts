@@ -85,7 +85,16 @@ async function transcribe(file: File, fallbackDuration: number): Promise<Transcr
     const segs = Array.isArray(data.segments) ? data.segments : [];
     duration = segs.length ? Number(segs[segs.length - 1].end) : fallbackDuration;
   }
-  return { text: (data.text ?? "").trim(), durationSec: Math.ceil(duration || fallbackDuration || 0) };
+  return { text: cleanTranscript(data.text ?? ""), durationSec: Math.ceil(duration || fallbackDuration || 0) };
+}
+
+// Whisper hallucinates on silence, typically as a short phrase repeated many times
+// ("abone ol abone ol abone ol...", "Altyazı M.K."). Collapse 3+ consecutive repeats.
+function cleanTranscript(raw: string): string {
+  let text = raw.replace(/\s+/g, " ").trim();
+  // phrase of 1-6 words repeated 3+ times back to back → keep one copy
+  text = text.replace(/\b((?:\S+\s+){0,5}\S+?)(?:[\s,.]+\1){2,}\b/giu, "$1");
+  return text.trim();
 }
 
 // ---------- Groq: transcript → tasks ----------
