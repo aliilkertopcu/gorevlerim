@@ -15,6 +15,14 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.32.3',
+    date: '2026-08-30',
+    fixes: [
+      'Kod düzeni: görev kartı ve grup yönetimi dosyaları parçalara bölündü (davranış değişikliği yok)',
+      'Flutter uyarıları sıfırlandı (RadioGroup, publishableKey, null-aware)',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.32.2',
     date: '2026-08-29',
     fixes: [

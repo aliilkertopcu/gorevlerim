@@ -310,7 +310,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   alignment: Alignment.topCenter,
                                   children: [
                                     ...previousChildren,
-                                    if (currentChild != null) currentChild,
+                                    ?currentChild,
                                   ],
                                 );
                               },

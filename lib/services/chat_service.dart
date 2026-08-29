@@ -32,8 +32,8 @@ class ChatService {
     String? userName,
   }) async {
     await _client.from('task_messages').insert({
-      if (taskId != null) 'task_id': taskId,
-      if (subtaskId != null) 'subtask_id': subtaskId,
+      'task_id': ?taskId,
+      'subtask_id': ?subtaskId,
       'user_id': userId,
       'user_name': userName,
       'content': content,
