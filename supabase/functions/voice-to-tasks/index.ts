@@ -200,6 +200,17 @@ async function extractTasks(transcript: string, viewDate: string, groupName: str
 }
 
 // ---------- Quota ----------
+// Per-user override (profiles.voice_limit_sec), falls back to env default
+async function getLimit(userId: string): Promise<number> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("voice_limit_sec")
+    .eq("id", userId)
+    .maybeSingle();
+  const v = Number(data?.voice_limit_sec);
+  return v > 0 ? v : DAILY_LIMIT;
+}
+
 async function getUsedToday(userId: string): Promise<number> {
   const { data } = await supabase
     .from("voice_usage")
@@ -230,9 +241,10 @@ Deno.serve(async (req) => {
 
   // POST ?status=1 → quota only; POST ?history=1 → last recordings
   const url = new URL(req.url);
+  const limit = await getLimit(userId);
   if (url.searchParams.get("status") === "1") {
     const used = await getUsedToday(userId);
-    return reply({ used_seconds: used, limit_seconds: DAILY_LIMIT });
+    return reply({ used_seconds: used, limit_seconds: limit });
   }
   if (url.searchParams.get("history") === "1") {
     const { data, error } = await supabase
@@ -264,12 +276,12 @@ Deno.serve(async (req) => {
 
     // Pre-check quota with the client-reported duration (cheap, avoids a wasted STT call)
     const usedBefore = await getUsedToday(userId);
-    if (usedBefore >= DAILY_LIMIT || usedBefore + clientDuration > DAILY_LIMIT) {
+    if (usedBefore >= limit || usedBefore + clientDuration > limit) {
       return reply({
         error: "quota_exceeded",
         message: "Bugünkü ses kaydı limitin doldu. Yarın tekrar deneyebilirsin.",
         used_seconds: usedBefore,
-        limit_seconds: DAILY_LIMIT,
+        limit_seconds: limit,
       }, 429);
     }
 
@@ -284,7 +296,7 @@ Deno.serve(async (req) => {
         tasks: [],
         ignored: [],
         used_seconds: usedAfter,
-        limit_seconds: DAILY_LIMIT,
+        limit_seconds: limit,
         message: "Kayıtta konuşma algılanamadı.",
       });
     }
@@ -308,7 +320,7 @@ Deno.serve(async (req) => {
       tasks: proposal.tasks,
       ignored: proposal.ignored,
       used_seconds: usedAfter,
-      limit_seconds: DAILY_LIMIT,
+      limit_seconds: limit,
       models: { stt: STT_MODEL, llm: LLM_MODEL },
     });
   } catch (err) {

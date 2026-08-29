@@ -56,6 +56,7 @@ async function resolveOwner(
   groupId?: string | null
 ): Promise<{ ownerId: string; ownerType: "group" }> {
   if (groupId) {
+    await assertGroupAccess(userId, groupId);
     return { ownerId: groupId, ownerType: "group" };
   }
 
@@ -69,6 +70,34 @@ async function resolveOwner(
   if (!data) throw new Error("Kişisel grup bulunamadı. Lütfen uygulamaya bir kez giriş yapın.");
 
   return { ownerId: data.id, ownerType: "group" };
+}
+
+// Authorization: the caller must be a member of the group that owns the task
+async function assertTaskAccess(userId: string, taskId: string): Promise<{ id: string; title: string; owner_id: string; owner_type: string }> {
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("id, title, owner_id, owner_type")
+    .eq("id", taskId)
+    .maybeSingle();
+  if (!task) throw new Error("Görev bulunamadı");
+  const { data: member } = await supabase
+    .from("group_members")
+    .select("user_id")
+    .eq("group_id", task.owner_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!member) throw new Error("Bu göreve erişim yetkin yok");
+  return task;
+}
+
+async function assertGroupAccess(userId: string, groupId: string): Promise<void> {
+  const { data: member } = await supabase
+    .from("group_members")
+    .select("user_id")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!member) throw new Error("Bu listeye erişim yetkin yok");
 }
 
 Deno.serve(async (req) => {
@@ -235,6 +264,7 @@ Deno.serve(async (req) => {
     // PATCH /tasks/:id — update a task
     if (method === "PATCH" && path.startsWith("tasks/")) {
       const taskId = path.replace("tasks/", "");
+      await assertTaskAccess(userId, taskId);
       const body = await req.json();
 
       const updates: any = {};
@@ -321,6 +351,7 @@ Deno.serve(async (req) => {
     // DELETE /tasks/:id — delete a task
     if (method === "DELETE" && path.startsWith("tasks/")) {
       const taskId = path.replace("tasks/", "");
+      await assertTaskAccess(userId, taskId);
 
       const { data, error } = await supabase
         .from("tasks")
@@ -421,6 +452,39 @@ Deno.serve(async (req) => {
           color: g.color,
           is_personal: g.is_personal,
         })),
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
+      });
+    }
+
+    // PATCH /subtasks/:id — update a subtask (status, title, block_reason)
+    if (method === "PATCH" && path.startsWith("subtasks/")) {
+      const subtaskId = path.replace("subtasks/", "");
+      const { data: sub } = await supabase
+        .from("subtasks")
+        .select("id, task_id, title")
+        .eq("id", subtaskId)
+        .maybeSingle();
+      if (!sub) throw new Error("Alt görev bulunamadı");
+      await assertTaskAccess(userId, sub.task_id);
+
+      const body = await req.json();
+      const updates: any = {};
+      if (body.title !== undefined) updates.title = body.title;
+      if (body.status !== undefined) updates.status = body.status;
+      if (body.block_reason !== undefined) updates.block_reason = body.block_reason;
+
+      const { data, error } = await supabase
+        .from("subtasks")
+        .update(updates)
+        .eq("id", subtaskId)
+        .select()
+        .single();
+      if (error) throw error;
+
+      return new Response(JSON.stringify({
+        message: `"${data.title}" güncellendi`,
+        subtask: { id: data.id, title: data.title, status: data.status },
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
       });

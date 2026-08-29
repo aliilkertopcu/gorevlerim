@@ -15,6 +15,20 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.31.1',
+    date: '2026-08-29',
+    features: [
+      'Claude MCP sunucusu yenilendi — kendi API anahtarınla Claude Desktop/Code üzerinden görev yönetimi (alt görev tamamlama, erteleme, listeler)',
+      'Kullanıcı bazlı ses kotası (profiles.voice_limit_sec)',
+    ],
+    fixes: [
+      'API: görev/alt görev değiştirme ve silme artık grup üyeliğiyle yetkilendiriliyor',
+      'API: alt görev güncelleme uç noktası eklendi (PATCH /subtasks/:id)',
+      'Sunucu sağlık kontrolü 60 saniyede bir (gereksiz istek azaltıldı)',
+      'Android release imzalama yapılandırıldı',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.31.0',
     date: '2026-08-29',
     features: [

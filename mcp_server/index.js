@@ -1,310 +1,203 @@
+#!/usr/bin/env node
+// Görevlerim MCP server — thin client over the todo-api edge function.
+//
+// Each user runs this with their OWN API key (from the app: menu → AI entegrasyonu),
+// so no Supabase service key is needed on the machine.
+//
+// Env:
+//   TODO_API_KEY   required — gorevlerim_xxx key
+//   TODO_API_URL   optional — default https://api.aitopcu.com/functions/v1/todo-api
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-// Environment variables
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const TODO_USER_ID = process.env.TODO_USER_ID; // Default user ID for personal tasks
+const API_KEY = process.env.TODO_API_KEY;
+const API_URL = (process.env.TODO_API_URL || "https://api.aitopcu.com/functions/v1/todo-api").replace(/\/$/, "");
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error("SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required");
+if (!API_KEY) {
+  console.error("TODO_API_KEY environment variable is required");
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-// Resolve user's personal group (all tasks are group-owned since migration 006)
-async function resolveOwner(groupId) {
-  if (groupId) return { ownerId: groupId, ownerType: "group" };
-
-  const { data } = await supabase
-    .from("groups")
-    .select("id")
-    .eq("created_by", TODO_USER_ID)
-    .eq("is_personal", true)
-    .maybeSingle();
-
-  if (!data) throw new Error("Kişisel grup bulunamadı. TODO_USER_ID doğru mu?");
-  return { ownerId: data.id, ownerType: "group" };
+async function api(method, path, body) {
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: {
+      "x-api-key": API_KEY,
+      "Content-Type": "application/json; charset=utf-8",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { error: text }; }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
 }
 
-// Helper: format date as YYYY-MM-DD
-function formatDate(dateStr) {
-  if (!dateStr || dateStr === "today") {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }
-  if (dateStr === "tomorrow") {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }
-  return dateStr; // Assume already YYYY-MM-DD
+const text = (s) => ({ content: [{ type: "text", text: s }] });
+const fail = (e) => text(`Hata: ${e.message || e}`);
+
+const STATUS_ICON = { pending: "⏳", completed: "✅", blocked: "🚫", postponed: "📅" };
+
+function renderTasks(data) {
+  if (!data.tasks?.length) return `${data.date} tarihinde görev yok.`;
+  const lines = data.tasks.map((t) => {
+    const icon = STATUS_ICON[t.status] || "❓";
+    const head = `${t.number}. ${icon} ${t.title}${t.block_reason ? ` (bloke: ${t.block_reason})` : ""}  [id:${t.id}]`;
+    const desc = t.description ? `\n     ${t.description.replace(/\n/g, "\n     ")}` : "";
+    const subs = (t.subtasks || [])
+      .map((s) => `     ${STATUS_ICON[s.status] || "❓"} ${s.title}  [subtask_id:${s.id}]`)
+      .join("\n");
+    return head + desc + (subs ? "\n" + subs : "");
+  });
+  return `📋 ${data.date} — ${data.completed}/${data.total} tamamlandı\n\n${lines.join("\n")}`;
 }
 
-// Create MCP Server
-const server = new McpServer({
-  name: "todo-app",
-  version: "1.0.0",
-});
+const server = new McpServer({ name: "gorevlerim", version: "2.0.0" });
 
-// Tool: List tasks for a date
+const dateArg = z.string().optional().describe("Tarih: YYYY-MM-DD, 'today'/'bugün', 'tomorrow'/'yarın', 'yesterday'/'dün'. Varsayılan: bugün");
+const groupArg = z.string().optional().describe("Liste (grup) ID'si. Boşsa kişisel liste. list_groups ile öğren.");
+
+server.tool(
+  "list_groups",
+  "Kullanıcının listelerini (gruplarını) göster",
+  {},
+  async () => {
+    try {
+      const data = await api("GET", "/groups");
+      if (!data.groups?.length) return text("Liste yok.");
+      return text(data.groups.map((g) => `• ${g.name}${g.is_personal ? " (kişisel)" : ""}  [id:${g.id}]`).join("\n"));
+    } catch (e) { return fail(e); }
+  },
+);
+
 server.tool(
   "list_tasks",
-  "Belirli bir tarihteki görevleri listele",
-  {
-    date: z.string().optional().describe("Tarih (YYYY-MM-DD, 'today', veya 'tomorrow'). Varsayılan: today"),
-    group_id: z.string().optional().describe("Grup ID'si. Belirtilmezse kişisel grup kullanılır."),
-  },
+  "Bir günün görevlerini alt görevleriyle listele",
+  { date: dateArg, group_id: groupArg },
   async ({ date, group_id }) => {
-    const dateStr = formatDate(date);
-    const { ownerId, ownerType } = await resolveOwner(group_id);
-
-    const { data: tasks, error } = await supabase
-      .from("tasks")
-      .select("*, subtasks(*)")
-      .eq("owner_id", ownerId)
-      .eq("owner_type", ownerType)
-      .eq("date", dateStr)
-      .order("sort_order", { ascending: true });
-
-    if (error) {
-      return { content: [{ type: "text", text: `Hata: ${error.message}` }] };
-    }
-
-    if (!tasks || tasks.length === 0) {
-      return { content: [{ type: "text", text: `${dateStr} tarihinde görev yok.` }] };
-    }
-
-    const summary = tasks.map((t, i) => {
-      const status = { pending: "⏳", completed: "✅", blocked: "🚫", postponed: "📅" }[t.status] || "❓";
-      const subtaskInfo = t.subtasks?.length
-        ? ` [${t.subtasks.filter((s) => s.status === "completed").length}/${t.subtasks.length} alt görev]`
-        : "";
-      const blockInfo = t.status === "blocked" && t.block_reason ? ` (Sebep: ${t.block_reason})` : "";
-      return `${i + 1}. ${status} ${t.title}${subtaskInfo}${blockInfo}`;
-    }).join("\n");
-
-    return {
-      content: [{ type: "text", text: `📋 ${dateStr} Görevleri:\n\n${summary}` }],
-    };
-  }
+    try {
+      const q = new URLSearchParams();
+      if (date) q.set("date", date);
+      if (group_id) q.set("group_id", group_id);
+      const data = await api("GET", `/tasks?${q}`);
+      return text(renderTasks(data));
+    } catch (e) { return fail(e); }
+  },
 );
 
-// Tool: Add a task
 server.tool(
   "add_task",
-  "Yeni görev ekle. Birden fazla görev eklemek için virgülle ayır.",
+  "Yeni görev ekle. Alt görevler için subtasks dizisini kullan. Birden fazla bağımsız görev için titles dizisi.",
   {
-    title: z.string().describe("Görev başlığı. Birden fazla görev için virgülle ayır: 'Market, Çamaşır, Fatura öde'"),
-    date: z.string().optional().describe("Tarih (YYYY-MM-DD, 'today', 'tomorrow'). Varsayılan: today"),
-    description: z.string().optional().describe("Açıklama. Alt görevler için her satırı '* ' ile başlat"),
-    group_id: z.string().optional().describe("Grup ID'si. Belirtilmezse kişisel grup kullanılır."),
+    title: z.string().optional().describe("Görev başlığı (tek görev)"),
+    titles: z.array(z.string()).optional().describe("Birden fazla bağımsız görev başlığı"),
+    description: z.string().optional().describe("Açıklama (opsiyonel)"),
+    subtasks: z.array(z.string()).optional().describe("Alt görev başlıkları (sadece tek görev için)"),
+    date: dateArg,
+    group_id: groupArg,
   },
-  async ({ title, date, description, group_id }) => {
-    const dateStr = formatDate(date);
-    const { ownerId, ownerType } = await resolveOwner(group_id);
-
-    // Support multiple tasks separated by comma
-    const titles = title.split(",").map((t) => t.trim()).filter(Boolean);
-    const createdTasks = [];
-
-    // Get current max sort_order
-    const { data: existing } = await supabase
-      .from("tasks")
-      .select("sort_order")
-      .eq("owner_id", ownerId)
-      .eq("owner_type", ownerType)
-      .eq("date", dateStr)
-      .order("sort_order", { ascending: false })
-      .limit(1);
-
-    let nextOrder = existing?.length ? existing[0].sort_order + 1 : 0;
-
-    for (const t of titles) {
-      // Parse subtasks from description
-      let cleanDesc = description || null;
-      const subtaskTitles = [];
-
-      if (description) {
-        const lines = description.split("\n");
-        const descLines = [];
-        for (const line of lines) {
-          if (line.trimStart().startsWith("* ")) {
-            subtaskTitles.push(line.trimStart().substring(2).trim());
-          } else {
-            descLines.push(line);
-          }
-        }
-        cleanDesc = descLines.join("\n").trim() || null;
-      }
-
-      const { data: task, error } = await supabase
-        .from("tasks")
-        .insert({
-          owner_id: ownerId,
-          owner_type: ownerType,
-          date: dateStr,
-          title: t,
-          description: titles.length === 1 ? cleanDesc : null,
-          status: "pending",
-          sort_order: nextOrder++,
-          created_by: TODO_USER_ID,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        return { content: [{ type: "text", text: `Hata: ${error.message}` }] };
-      }
-
-      // Create subtasks (only for single task with description)
-      if (titles.length === 1 && subtaskTitles.length > 0) {
-        const subtaskInserts = subtaskTitles.map((st, idx) => ({
-          task_id: task.id,
-          title: st,
-          status: "pending",
-          sort_order: idx,
-        }));
-        await supabase.from("subtasks").insert(subtaskInserts);
-      }
-
-      createdTasks.push(task);
-    }
-
-    const result = createdTasks.map((t) => `✅ "${t.title}" eklendi`).join("\n");
-    return {
-      content: [{ type: "text", text: `${dateStr} tarihine görev(ler) eklendi:\n\n${result}` }],
-    };
-  }
+  async ({ title, titles, description, subtasks, date, group_id }) => {
+    try {
+      if (!title && !titles?.length) return text("title veya titles gerekli.");
+      const data = await api("POST", "/tasks", { title, titles, description, subtasks, date, group_id });
+      return text(`${data.message} (${data.date}):\n` + data.created.map((c) => `• ${c.title}  [id:${c.id}]`).join("\n"));
+    } catch (e) { return fail(e); }
+  },
 );
 
-// Tool: Update a task
 server.tool(
   "update_task",
-  "Görev güncelle (başlık, açıklama, durum değiştir)",
+  "Görevi güncelle: başlık, açıklama, durum, bloke sebebi, tarih",
   {
-    task_id: z.string().describe("Görev ID'si"),
-    title: z.string().optional().describe("Yeni başlık"),
-    description: z.string().optional().describe("Yeni açıklama"),
-    status: z.enum(["pending", "completed", "blocked", "postponed"]).optional().describe("Yeni durum"),
-    block_reason: z.string().optional().describe("Bloke sebebi (status=blocked ise)"),
-    postpone_to: z.string().optional().describe("Erteleme tarihi (YYYY-MM-DD veya 'tomorrow')"),
+    task_id: z.string().describe("Görev ID'si (list_tasks çıktısındaki id)"),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    status: z.enum(["pending", "completed", "blocked", "postponed"]).optional(),
+    block_reason: z.string().optional(),
+    date: z.string().optional().describe("Yeni tarih (YYYY-MM-DD / tomorrow)"),
   },
-  async ({ task_id, title, description, status, block_reason, postpone_to }) => {
-    const updates = {};
-    if (title) updates.title = title;
-    if (description !== undefined) updates.description = description;
-    if (status) updates.status = status;
-    if (block_reason) updates.block_reason = block_reason;
-    if (postpone_to) {
-      updates.date = formatDate(postpone_to);
-      updates.status = "pending";
-    }
-    updates.updated_at = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from("tasks")
-      .update(updates)
-      .eq("id", task_id)
-      .select()
-      .single();
-
-    if (error) {
-      return { content: [{ type: "text", text: `Hata: ${error.message}` }] };
-    }
-
-    return {
-      content: [{ type: "text", text: `✅ "${data.title}" güncellendi. Durum: ${data.status}` }],
-    };
-  }
+  async ({ task_id, ...rest }) => {
+    try {
+      const body = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+      const data = await api("PATCH", `/tasks/${task_id}`, body);
+      return text(`✅ ${data.message} — durum: ${data.task.status}`);
+    } catch (e) { return fail(e); }
+  },
 );
 
-// Tool: Complete a task
 server.tool(
   "complete_task",
-  "Görevi tamamlandı olarak işaretle (sıra numarasıyla veya ID ile)",
+  "Görevi tamamla (sıra numarası veya ID ile). Alt görevler de tamamlanır.",
   {
-    task_number: z.number().optional().describe("Görev sıra numarası (1'den başlar)"),
-    task_id: z.string().optional().describe("Görev ID'si"),
-    date: z.string().optional().describe("Tarih. Varsayılan: today"),
-    group_id: z.string().optional().describe("Grup ID'si. Belirtilmezse kişisel grup kullanılır."),
+    task_number: z.number().optional().describe("list_tasks'taki sıra numarası"),
+    task_id: z.string().optional(),
+    date: dateArg,
+    group_id: groupArg,
   },
   async ({ task_number, task_id, date, group_id }) => {
-    let targetId = task_id;
-
-    if (!targetId && task_number) {
-      const dateStr = formatDate(date);
-      const { ownerId, ownerType } = await resolveOwner(group_id);
-
-      const { data: tasks } = await supabase
-        .from("tasks")
-        .select("id, title")
-        .eq("owner_id", ownerId)
-        .eq("owner_type", ownerType)
-        .eq("date", dateStr)
-        .order("sort_order", { ascending: true });
-
-      if (!tasks || task_number > tasks.length) {
-        return { content: [{ type: "text", text: `${task_number}. görev bulunamadı.` }] };
+    try {
+      if (task_id) {
+        const data = await api("PATCH", `/tasks/${task_id}`, { status: "completed" });
+        return text(`✅ ${data.message}`);
       }
-
-      targetId = tasks[task_number - 1].id;
-    }
-
-    if (!targetId) {
-      return { content: [{ type: "text", text: "task_number veya task_id gerekli." }] };
-    }
-
-    const { data, error } = await supabase
-      .from("tasks")
-      .update({ status: "completed", updated_at: new Date().toISOString() })
-      .eq("id", targetId)
-      .select()
-      .single();
-
-    if (error) {
-      return { content: [{ type: "text", text: `Hata: ${error.message}` }] };
-    }
-
-    return {
-      content: [{ type: "text", text: `✅ "${data.title}" tamamlandı!` }],
-    };
-  }
+      if (!task_number) return text("task_number veya task_id gerekli.");
+      const data = await api("POST", "/tasks/complete", { task_number, date, group_id });
+      return text(`✅ ${data.message}`);
+    } catch (e) { return fail(e); }
+  },
 );
 
-// Tool: Delete a task
+server.tool(
+  "complete_subtask",
+  "Bir alt görevi tamamla (veya geri al)",
+  {
+    subtask_id: z.string().describe("list_tasks çıktısındaki subtask_id"),
+    done: z.boolean().optional().describe("false verilirse 'bekliyor'a geri alınır. Varsayılan: true"),
+  },
+  async ({ subtask_id, done }) => {
+    try {
+      const data = await api("PATCH", `/subtasks/${subtask_id}`, { status: done === false ? "pending" : "completed" });
+      return text(`${done === false ? "↩️" : "✅"} ${data.message}`);
+    } catch (e) { return fail(e); }
+  },
+);
+
+server.tool(
+  "postpone_task",
+  "Görevi başka güne ertele (sıra numarasıyla)",
+  {
+    task_number: z.number().describe("list_tasks'taki sıra numarası"),
+    target_date: z.string().optional().describe("Hedef tarih. Varsayılan: yarın"),
+    date: dateArg,
+    group_id: groupArg,
+  },
+  async ({ task_number, target_date, date, group_id }) => {
+    try {
+      const data = await api("POST", "/tasks/postpone", { task_number, target_date, date, group_id });
+      return text(`📅 ${data.message}`);
+    } catch (e) { return fail(e); }
+  },
+);
+
 server.tool(
   "delete_task",
-  "Görevi sil",
-  {
-    task_id: z.string().describe("Silinecek görev ID'si"),
-  },
+  "Görevi kalıcı olarak sil",
+  { task_id: z.string().describe("Görev ID'si") },
   async ({ task_id }) => {
-    const { data, error } = await supabase
-      .from("tasks")
-      .delete()
-      .eq("id", task_id)
-      .select()
-      .single();
-
-    if (error) {
-      return { content: [{ type: "text", text: `Hata: ${error.message}` }] };
-    }
-
-    return {
-      content: [{ type: "text", text: `🗑️ "${data.title}" silindi.` }],
-    };
-  }
+    try {
+      const data = await api("DELETE", `/tasks/${task_id}`);
+      return text(`🗑️ ${data.message}`);
+    } catch (e) { return fail(e); }
+  },
 );
 
-// Start server
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Todo MCP Server running on stdio");
+  console.error("Görevlerim MCP server running (stdio)");
 }
 
-main().catch(console.error);
+main().catch((e) => { console.error(e); process.exit(1); });
