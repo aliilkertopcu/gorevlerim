@@ -15,6 +15,15 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.30.1',
+    date: '2026-08-29',
+    fixes: [
+      'ChatGPT / Custom GPT kalıntıları temizlendi — bağlantı ekranı, OAuth fonksiyonları ve onboarding kartı kaldırıldı',
+      'Hoşgeldin görevindeki ölü Custom GPT linki mikrofon ipucuyla değiştirildi (mevcut kullanıcılar dahil)',
+      'Onboarding'deki beta davet linki aitopcu.com/tasks adresine güncellendi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.30.0',
     date: '2026-08-29',
     features: [

@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local tool state
+.claude/settings.local.json
+supabase/.temp/

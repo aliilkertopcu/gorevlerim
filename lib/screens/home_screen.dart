@@ -12,7 +12,6 @@ import '../widgets/task_card.dart';
 import '../widgets/task_form.dart';
 import '../widgets/group_selector.dart';
 import '../widgets/group_manager.dart';
-// import '../widgets/ai_setup_dialog.dart'; // OAuth ile otomatik bağlantı kurulduğundan devre dışı
 import '../widgets/connection_banner.dart';
 import '../providers/connection_provider.dart';
 import '../widgets/desktop_dialog.dart';

@@ -21,7 +21,7 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 
 ## Mimari
 - `lib/main.dart` — Supabase init (URL: api.aitopcu.com), tema, WebScrollBehavior
-- `lib/router.dart` — GoRouter; `/onboarding`, `/invite`, `/gpt-connect` auth redirect dışında
+- `lib/router.dart` — GoRouter; `/onboarding`, `/invite` auth redirect dışında
 - `lib/providers/` — Riverpod: auth, task (optimistic update + realtime stream), group, chat, connection (15s health check), theme
 - `lib/services/` — Supabase erişim katmanı; `history_service.dart` salt okunur (loglama DB trigger'da)
 - `lib/widgets/task_card.dart` (1500 satır) — en karmaşık widget: subtask düzenleme, sürükleme, sağ tık menü
@@ -40,12 +40,12 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 - `api_keys` — kullanıcı başına 1 anahtar (`gorevlerim_xxx`), AI entegrasyonu için
 - Migration'lar `supabase/migrations/` altında, sırayla uygulanır; şema değişikliğinde yeni numaralı dosya ekle
 
-## AI entegrasyonu (durum: ChatGPT tarafı çalışmıyor)
-- `supabase/functions/todo-api` — REST API (`x-api-key` / Bearer / `?api_key=`): tasks list/create/patch/delete/complete/postpone, groups
-- `supabase/functions/gpt-auth`, `gpt-oauth` — Custom GPT için sahte OAuth (api_key'i access_token olarak döner). ChatGPT hesabı kapandığı için ölü kod.
-- `mcp_server/` — Node MCP server (stdio), service-role key ile doğrudan Supabase'e yazar. Claude Desktop/Claude Code'a bağlanabilir. Tek kullanıcılı (`TODO_USER_ID` env).
-- `lib/widgets/ai_setup_dialog.dart` — API key + prompt üretir (menüden gizlenmiş)
-- `lib/screens/gpt_connect_screen.dart`, `task_form.dart` ChatGPT butonu, onboarding ve welcome task'taki Custom GPT linkleri → hepsi ChatGPT'ye bağımlı
+## AI / ses entegrasyonu
+- `supabase/functions/voice-to-tasks` — uygulama içi sesle görev ekleme. JWT auth, günlük 600 s kota (`voice_usage` tablosu, migration 011), Groq `whisper-large-v3-turbo` (tr) → Groq `qwen/qwen3.8-27b` strict JSON schema → `{tasks, ignored}`. DB'ye yazmaz; Flutter önizleme sonrası `task_service.createTask` ile yazar. Secret: `GROQ_API_KEY` (`npx supabase secrets set`).
+- Flutter: `lib/widgets/voice_task_dialog.dart` (akış), `lib/services/voice_service.dart` (istemci), `lib/providers/voice_provider.dart`; kayıt `record` paketi (web: webm/opus blob, mobil: dosya).
+- `supabase/functions/todo-api` — API key ile REST (`x-api-key` / Bearer / `?api_key=`). `api_keys` tablosu, `lib/services/api_key_service.dart`, `lib/widgets/ai_setup_dialog.dart` (menüde gizli). Claude MCP/REST köprüsü için duruyor.
+- `mcp_server/` — Node MCP server (stdio), service-role key ile doğrudan Supabase. Tek kullanıcılı (`TODO_USER_ID`). Claude Desktop/Code'a bağlanabilir.
+- ChatGPT Custom GPT entegrasyonu 2026-08-29'da tamamen kaldırıldı (gpt-auth/gpt-oauth fonksiyonları, gpt_connect_screen, onboarding kartı).
 
 ## Sunucu
 - Linode 172.105.93.29, SSH key `~/.ssh/linode_admin`
@@ -61,5 +61,5 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 
 ## Notlar
 - `DEVELOPMENT_LOG.md` eski (GitHub Pages dönemi); güncel gerçek kaynak bu dosya + changelog.dart
-- `.claude/settings.local.json` ve `supabase/.temp/` git'te takip ediliyor — takipten çıkarılmalı
+- `.claude/settings.local.json` ve `supabase/.temp/` gitignore'da (2026-08-29)
 - Android release imzası yok (debug key), `pubspec.yaml` version alanı 1.0.0+1 (uygulama sürümü `lib/version.dart`'ta)
