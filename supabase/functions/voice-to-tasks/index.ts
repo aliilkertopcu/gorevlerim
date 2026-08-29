@@ -67,6 +67,8 @@ async function transcribe(file: File, fallbackDuration: number): Promise<Transcr
   form.append("language", "tr");
   form.append("response_format", "verbose_json");
   form.append("temperature", "0");
+  // Style/vocabulary hint: proper Turkish punctuation and typical task phrasing
+  form.append("prompt", "Bugünkü görevler: çamaşırları makineye at, bulaşık makinesini boşalt, mutfağı topla, çiçekleri sula, çalışma odasını düzenle. Yarın diş hekimine git.");
 
   const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
     method: "POST",
@@ -125,17 +127,25 @@ const taskSchema = {
   additionalProperties: false,
 };
 
-function buildSystemPrompt(viewDate: string): string {
+function buildSystemPrompt(viewDate: string, groupName: string): string {
   const today = todayISO();
+  const groupLine = groupName
+    ? `Görevler "${groupName}" adlı listeye eklenecek; bu listenin adı zaten bağlamı verir, aynı adla bir üst görev UYDURMA.`
+    : "";
   return `Sen bir görev asistanısın. Kullanıcı Türkçe konuşarak yapacağı işleri anlatıyor; sen bu konuşmadan yapılandırılmış görev listesi çıkarıyorsun.
 
 Bugünün tarihi: ${today}. Kullanıcının uygulamada baktığı gün: ${viewDate}. Tarih söylenmeyen görevleri ${viewDate} tarihine koy.
+${groupLine}
+
+Metin otomatik ses tanımadan geliyor; yanlış duyulmuş kelimeler olabilir. Bağlamdan açıkça anlaşılan hataları düzelt ("İstanbul'a giriş için hazırlanan çanta" → "İstanbul'a gidiş", "mutfak topla" → "mutfağı topla"). Emin olmadığın yerde metne sadık kal.
 
 Kurallar:
 - Sadece yapılacak iş niteliğindeki ifadeleri görev yap. Sohbet, düşünce, arka plandaki kişilere veya hayvanlara söylenen sözler ("dur", "köpek yapma", "bir saniye"), tekrarlar ve dolgu kelimeleri görev DEĞİLDİR; bunları "ignored" listesine kısa parçalar halinde koy.
-- Kullanıcı "alt görev", "bunun altına", "şunları da içersin", "adımları" gibi ifadelerle hiyerarşi kurarsa alt görev olarak yapılandır. Birbirine bağlı küçük adımlar varsa ana görev + alt görevler olarak grupla.
-- Görev başlıkları kısa, emir kipinde, ilk harfi büyük olsun ("Market alışverişi yap"). Açıklamaya sadece başlığa sığmayan gerçek detayı yaz; yoksa boş string.
+- Hiyerarşi kuralı: Birbirinden bağımsız işler (çamaşır at, bulaşık makinesini boşalt, çiçekleri sula) AYRI görevlerdir; hepsini tek bir uydurma başlık altına gömme. Bir işin adımları veya parçaları (market → süt, ekmek; sunum → slaytlar, prova) o işin ALT GÖREVLERİDİR. Kullanıcı "alt görev", "bunun altına", "adımları" derse hiyerarşiyi onun dediği gibi kur.
+- Görev başlıkları Türkçe dil bilgisine uygun, kısa ve emir kipinde olsun; nesne ekleri doğru olsun ("Mutfağı topla", "Bulaşık makinesini boşalt", "Çiçekleri sula" — "Mutfak topla" değil). İlk harf büyük, sonda nokta yok. Açıklamaya sadece başlığa sığmayan gerçek detayı yaz; yoksa boş string.
 - Tarihleri çöz: "bugün" = ${today}; "yarın", "cuma", "haftaya", "ayın 15'i" gibi ifadeleri ${today} tarihine göre YYYY-MM-DD formatına çevir. Belirsizse ${viewDate}.
+- Bir görevin hemen ardından gelen açıklayıcı cümle ("…, İstanbul'a gidiş için hazırlanan çantalar") o görevin description alanına yazılır; ignored'a atılmaz.
+- Yanlış duyulmuş olsa bile iş gibi görünen ifadeyi DÜŞÜRME; en makul düzeltmeyle görev yap ("tüm makinesini yerleştir" → "Ütü makinesini yerleştir"). Sadece hiç anlam verilemeyen parçaları ignored'a koy.
 - Aynı görevi iki kez yazma; kullanıcı kendini düzeltirse ("yok onu iptal et") son halini al.
 - Konuşmada hiç görev yoksa tasks boş dizi olsun.
 - Sadece şemaya uygun JSON döndür.`;
@@ -146,7 +156,7 @@ interface Proposal {
   ignored: string[];
 }
 
-async function extractTasks(transcript: string, viewDate: string): Promise<Proposal> {
+async function extractTasks(transcript: string, viewDate: string, groupName: string): Promise<Proposal> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -157,7 +167,7 @@ async function extractTasks(transcript: string, viewDate: string): Promise<Propo
       model: LLM_MODEL,
       temperature: 0.2,
       messages: [
-        { role: "system", content: buildSystemPrompt(viewDate) },
+        { role: "system", content: buildSystemPrompt(viewDate, groupName) },
         { role: "user", content: transcript },
       ],
       response_format: {
@@ -218,11 +228,21 @@ Deno.serve(async (req) => {
   const userId = await authenticate(req);
   if (!userId) return reply({ error: "Unauthorized" }, 401);
 
-  // GET-like status probe: POST with ?status=1 returns quota only
+  // POST ?status=1 → quota only; POST ?history=1 → last recordings
   const url = new URL(req.url);
   if (url.searchParams.get("status") === "1") {
     const used = await getUsedToday(userId);
     return reply({ used_seconds: used, limit_seconds: DAILY_LIMIT });
+  }
+  if (url.searchParams.get("history") === "1") {
+    const { data, error } = await supabase
+      .from("voice_transcripts")
+      .select("id, created_at, duration_seconds, transcript, proposal, group_id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) return reply({ error: error.message }, 500);
+    return reply({ items: data ?? [] });
   }
 
   try {
@@ -234,6 +254,9 @@ Deno.serve(async (req) => {
     const clientDuration = Math.ceil(Number(form.get("duration_seconds") ?? 0)) || 0;
     const viewDateRaw = String(form.get("date") ?? "");
     const viewDate = /^\d{4}-\d{2}-\d{2}$/.test(viewDateRaw) ? viewDateRaw : todayISO();
+    const groupName = String(form.get("group_name") ?? "").trim().slice(0, 80);
+    const groupIdRaw = String(form.get("group_id") ?? "");
+    const groupId = /^[0-9a-f-]{36}$/i.test(groupIdRaw) ? groupIdRaw : null;
 
     if (clientDuration > MAX_CLIP) {
       return reply({ error: `Tek kayıt en fazla ${Math.floor(MAX_CLIP / 60)} dakika olabilir` }, 400);
@@ -266,7 +289,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    const proposal = await extractTasks(transcript.text, viewDate);
+    const proposal = await extractTasks(transcript.text, viewDate, groupName);
+
+    // Keep history for review/debugging
+    const { error: histErr } = await supabase.from("voice_transcripts").insert({
+      user_id: userId,
+      group_id: groupId,
+      duration_seconds: transcript.durationSec,
+      transcript: transcript.text,
+      proposal,
+      stt_model: STT_MODEL,
+      llm_model: LLM_MODEL,
+    });
+    if (histErr) console.error("voice_transcripts insert:", histErr.message);
 
     return reply({
       transcript: transcript.text,

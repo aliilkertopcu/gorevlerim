@@ -64,6 +64,24 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
   bool _showTranscript = false;
   bool _showIgnored = false;
 
+  bool _showHistory = false;
+  List<VoiceHistoryItem>? _history;
+  String? _historyError;
+
+  Future<void> _toggleHistory() async {
+    setState(() => _showHistory = !_showHistory);
+    if (_showHistory && _history == null) {
+      try {
+        final items = await ref.read(voiceServiceProvider).fetchHistory();
+        if (!mounted) return;
+        setState(() => _history = items);
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _historyError = e.toString());
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -213,6 +231,8 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
             fileName: 'audio.$_fileExt',
             durationSeconds: duration,
             viewDate: ref.read(selectedDateProvider),
+            groupId: ref.read(currentGroupProvider)?.id,
+            groupName: ref.read(currentGroupProvider)?.name,
           );
 
       if (!mounted) return;
@@ -391,7 +411,14 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
         ),
         const SizedBox(height: 20),
         _quotaLine(context),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        _Expander(
+          label: 'Önceki kayıtlar',
+          expanded: _showHistory,
+          onToggle: _toggleHistory,
+          child: _buildHistory(context),
+        ),
+        const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
@@ -399,6 +426,49 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
             child: const Text('Kapat'),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildHistory(BuildContext context) {
+    final theme = Theme.of(context);
+    if (_historyError != null) {
+      return Text(_historyError!, style: theme.textTheme.bodySmall?.copyWith(color: Colors.red));
+    }
+    final items = _history;
+    if (items == null) {
+      return const Padding(
+        padding: EdgeInsets.all(8),
+        child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+    if (items.isEmpty) {
+      return Text('Henüz kayıt yok.', style: theme.textTheme.bodySmall);
+    }
+    final fmt = DateFormat('d MMM HH:mm', 'tr_TR');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${fmt.format(item.createdAt)} · ${_fmt(item.durationSeconds)} · ${item.taskTitles.length} görev',
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                SelectableText(item.transcript, style: theme.textTheme.bodySmall),
+                if (item.taskTitles.isNotEmpty)
+                  Text(
+                    '→ ${item.taskTitles.join(' · ')}',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                  ),
+              ],
+            ),
+          ),
       ],
     );
   }

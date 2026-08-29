@@ -52,6 +52,37 @@ class VoiceResult {
   });
 }
 
+class VoiceHistoryItem {
+  final String id;
+  final DateTime createdAt;
+  final int durationSeconds;
+  final String transcript;
+  final List<String> taskTitles;
+
+  const VoiceHistoryItem({
+    required this.id,
+    required this.createdAt,
+    required this.durationSeconds,
+    required this.transcript,
+    required this.taskTitles,
+  });
+
+  factory VoiceHistoryItem.fromJson(Map<String, dynamic> json) {
+    final proposal = json['proposal'] as Map<String, dynamic>? ?? {};
+    final tasks = proposal['tasks'] as List<dynamic>? ?? [];
+    return VoiceHistoryItem(
+      id: json['id'] as String,
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal() ?? DateTime.now(),
+      durationSeconds: json['duration_seconds'] as int? ?? 0,
+      transcript: json['transcript'] as String? ?? '',
+      taskTitles: tasks
+          .map((t) => (t as Map<String, dynamic>)['title']?.toString() ?? '')
+          .where((t) => t.isNotEmpty)
+          .toList(),
+    );
+  }
+}
+
 class VoiceQuota {
   final int usedSeconds;
   final int limitSeconds;
@@ -102,6 +133,8 @@ class VoiceService {
     required String fileName,
     required int durationSeconds,
     required DateTime viewDate,
+    String? groupId,
+    String? groupName,
   }) async {
     final token = _token;
     if (token == null) throw Exception('Oturum bulunamadı');
@@ -110,6 +143,8 @@ class VoiceService {
       ..headers['Authorization'] = 'Bearer $token'
       ..fields['duration_seconds'] = durationSeconds.toString()
       ..fields['date'] = _dateKey(viewDate)
+      ..fields['group_id'] = groupId ?? ''
+      ..fields['group_name'] = groupName ?? ''
       ..files.add(http.MultipartFile.fromBytes(
         'file',
         audioBytes,
@@ -143,6 +178,22 @@ class VoiceService {
       limitSeconds: json['limit_seconds'] as int? ?? 600,
       message: json['message'] as String?,
     );
+  }
+
+  Future<List<VoiceHistoryItem>> fetchHistory() async {
+    final token = _token;
+    if (token == null) throw Exception('Oturum bulunamadı');
+    final res = await http.post(
+      _endpoint.replace(queryParameters: {'history': '1'}),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 20));
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(json['error'] ?? 'Geçmiş alınamadı');
+    }
+    return (json['items'] as List<dynamic>? ?? [])
+        .map((e) => VoiceHistoryItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   static String _dateKey(DateTime d) =>

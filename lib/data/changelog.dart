@@ -15,6 +15,20 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.31.0',
+    date: '2026-08-29',
+    features: [
+      'Sesli kayıt geçmişi — dialogda "Önceki kayıtlar" bölümünden eski metinleri ve çıkan görevleri görebilirsin',
+      'Yapay zeka artık seçili listenin adını biliyor — "Ev İşleri" listesinde aynı adla üst görev uydurmuyor',
+    ],
+    fixes: [
+      'Görev başlıkları Türkçe dil bilgisine uygun üretiliyor ("Mutfağı topla", "Bulaşık makinesini boşalt")',
+      'Yanlış duyulan kelimeler bağlamdan düzeltiliyor; iş gibi görünen ifadeler artık düşürülmüyor',
+      'Görevin ardından gelen açıklama cümlesi açıklama alanına yazılıyor',
+      'Google ile giriş hatası düzeltildi (Supabase Site URL ayarındaki bozuk değer)',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.30.1',
     date: '2026-08-29',
     fixes: [
