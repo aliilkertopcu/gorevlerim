@@ -20,7 +20,7 @@ const List<ChangelogEntry> changelog = [
     fixes: [
       'ChatGPT / Custom GPT kalıntıları temizlendi — bağlantı ekranı, OAuth fonksiyonları ve onboarding kartı kaldırıldı',
       'Hoşgeldin görevindeki ölü Custom GPT linki mikrofon ipucuyla değiştirildi (mevcut kullanıcılar dahil)',
-      'Onboarding'deki beta davet linki aitopcu.com/tasks adresine güncellendi',
+      'Onboarding sayfasındaki beta davet linki aitopcu.com/tasks adresine güncellendi',
     ],
   ),
   ChangelogEntry(
