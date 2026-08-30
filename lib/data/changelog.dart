@@ -15,6 +15,13 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.33.1',
+    date: '2026-08-30',
+    fixes: [
+      'Flutter 3.47 ve tüm paketler güncel major sürümlere yükseltildi (go_router 18, record 7, riverpod 3.4)',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.33.0',
     date: '2026-08-30',
     features: [

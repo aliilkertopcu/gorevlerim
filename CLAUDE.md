@@ -1,6 +1,6 @@
 # Görevlerim — Todo App
 
-Flutter (web + Android) todo uygulaması. Supabase backend, Riverpod state, GoRouter.
+Flutter 3.47+ (web + Android) todo uygulaması. Supabase backend, Riverpod state, GoRouter.
 Canlı: https://aitopcu.com/tasks/ (Linode VPS, nginx). Supabase trafiği `https://api.aitopcu.com` proxy'si üzerinden geçer.
 
 ## Komutlar
