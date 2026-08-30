@@ -1,0 +1,110 @@
+[
+  {
+    "id": "ali-2026-08-30-taahhut",
+    "source": "real recording, Ali, 2026-08-30 07:51, group Ev İşleri",
+    "group_name": "🏡 Ev İşleri",
+    "date": "+0",
+    "transcript": "Evet, bugüne yeni görev. Anabaşlık taahhüt işleri. Alt görev. Meslehan'ın muayenehanesinin internet aboneliğinin anlaşmasının yapılması. İkinci alt görev, Türk Telekom hütümün ne zaman bittiğinin netleştirilmesi. Üçüncü alt görev, Vodafone tarifesinin seçilmesi. Bugünün yeni işi, Suzuki'nin temizlenmesi. Başka bir yeni iş. Xiaomi robot süpürgenin neden temizlemediğini bakacağız. Tamirat, mağminat yapacağız. Yarına iş. Makine mühendisleri odasına asansör bakımı için faturanın yatırılması.",
+    "expect": {
+      "task_count": 4,
+      "tasks": [
+        {
+          "title_contains": "taahhüt",
+          "subtask_count": 3,
+          "date": "+0"
+        },
+        {
+          "title_contains": "suzuki",
+          "subtask_count": 0,
+          "date": "+0"
+        },
+        {
+          "title_contains": "xiaomi",
+          "subtask_count": 0,
+          "date": "+0"
+        },
+        {
+          "title_contains": "fatura",
+          "subtask_count": 0,
+          "date": "+1"
+        }
+      ],
+      "ignored_max": 1
+    }
+  },
+  {
+    "id": "neslihan-2026-08-30-balkon",
+    "source": "real recording, Neslihan, 2026-08-30 11:48, group Ev İşleri",
+    "group_name": "🏡 Ev İşleri",
+    "date": "+0",
+    "transcript": "Balkonlar yıkanacak. Kendi odamı toplayacağım. Ama bunu Neslihan'ın işi olarak bir üst başlık üzerinde alt başlık olarak ekleyebilirsin. Çamaşırlar dürülecek, ütü yapılacak. Bir de bir saat uyulacak.",
+    "expect": {
+      "task_count": 1,
+      "tasks": [
+        {
+          "title_contains": "neslihan",
+          "subtask_count": 5,
+          "date": "+0"
+        }
+      ],
+      "ignored_max": 0
+    }
+  },
+  {
+    "id": "tts-market-sunum",
+    "source": "synthetic (edge-tts), first smoke test",
+    "group_name": "Günlük Görevler",
+    "date": "+0",
+    "transcript": "Şimdi yarın için görevleri söylüyorum. Birincisi, market alışverişi yap. Bunun altına alt görev olarak süt, ekmek ve yumurta al. Dur, köpek, yapma onu, bırak. Neyse devam ediyorum. İkinci görev, cuma günü diş hekimi randevusu al. Üçüncüsü, Neslihan'a bütçe tablosunu gönder, bu bugün olsun. Son olarak, haftaya sunum hazırla, adımları: slaytları yaz, grafikleri ekle, prova yap.",
+    "expect": {
+      "task_count": 4,
+      "tasks": [
+        {
+          "title_contains": "market",
+          "subtask_count": 3,
+          "date": "+1"
+        },
+        {
+          "title_contains": "diş",
+          "subtask_count": 0,
+          "date": "fri"
+        },
+        {
+          "title_contains": "bütçe",
+          "subtask_count": 0,
+          "date": "+0"
+        },
+        {
+          "title_contains": "sunum",
+          "subtask_count": 3
+        }
+      ],
+      "ignored_max": 2
+    }
+  },
+  {
+    "id": "tts-ev-isleri-flat",
+    "source": "synthetic (edge-tts), flat chores in 'Ev İşleri' — no fake parent expected",
+    "group_name": "Ev İşleri",
+    "date": "+0",
+    "transcript": "Ev işleri neler? Bir, çamaşır at. İki, mutfak topla. Çantaları boşalt, İstanbul'a gidiş ve dünkü yürüyüş için hazırlanan çantalar. Ütü makinesini yerleştir. Bulaşık makinesini boşalt. Çiçekleri sula. Kar küreme aletini sığınağa indir. Çalışma odasını temizle ve düzenle.",
+    "expect": {
+      "task_count": 8,
+      "tasks": [
+        {
+          "title_contains": "mutfağı",
+          "subtask_count": 0
+        },
+        {
+          "title_contains": "çanta",
+          "description_contains": "istanbul"
+        },
+        {
+          "title_contains": "ütü",
+          "subtask_count": 0
+        }
+      ],
+      "ignored_max": 1
+    }
+  }
+]

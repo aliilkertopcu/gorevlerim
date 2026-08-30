@@ -15,6 +15,18 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.33.2',
+    date: '2026-08-30',
+    features: [
+      'Sesle görev: "bunları X başlığı altına ekle" gibi geriye dönük gruplama ve "balkonlar yıkanacak" gibi edilgen kalıplar artık doğru yorumlanıyor',
+      'Ses tanıma sözlüğüne geçmiş görevlerdeki özel kelimeler (marka, yer, kişi) eklendi',
+    ],
+    fixes: [
+      'Yapay zeka yoğunken (dakikalık limit) otomatik yeniden deneme; kullanıcıya anlaşılır mesaj',
+      'Ses arşivi 30 gün sonra otomatik temizleniyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.33.1',
     date: '2026-08-30',
     fixes: [

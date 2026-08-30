@@ -43,7 +43,7 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 - Migration'lar `supabase/migrations/` altında, sırayla uygulanır; şema değişikliğinde yeni numaralı dosya ekle
 
 ## AI / ses entegrasyonu
-- `supabase/functions/voice-to-tasks` — uygulama içi sesle görev ekleme. JWT auth, günlük 600 s kota (`voice_usage` tablosu, migration 011), Groq `whisper-large-v3` (tr, grup üyesi adları Whisper prompt'unda) → Groq `qwen/qwen3.8-27b` strict JSON schema → `{tasks, ignored}`. Form alanı `transcript` verilirse STT atlanır (prompt testi için). Ses klipleri geçici olarak Storage `voice-audio/{user}/{transcript_id}` altında saklanır (`VOICE_KEEP_AUDIO=false` ile kapanır; iyileştirme bitince bucket + `audio_path` kaldırılacak). DB'ye yazmaz; Flutter önizleme sonrası `task_service.createTask` ile yazar. Secret: `GROQ_API_KEY` (`npx supabase secrets set`).
+- `supabase/functions/voice-to-tasks` — uygulama içi sesle görev ekleme. JWT auth, günlük 600 s kota (`voice_usage` tablosu, migration 011), Groq `whisper-large-v3` (tr, grup üyesi adları Whisper prompt'unda) → Groq `qwen/qwen3.8-27b` strict JSON schema → `{tasks, ignored}`. Form alanı `transcript` verilirse STT atlanır (prompt testi için). Ses klipleri geçici olarak Storage `voice-audio/{user}/{transcript_id}` altında saklanır (`VOICE_KEEP_AUDIO=false` ile kapanır; pg_cron `purge_old_voice_audio` 30 günden eski klipleri siler; iyileştirme bitince bucket + `audio_path` kaldırılacak). DB'ye yazmaz; Flutter önizleme sonrası `task_service.createTask` ile yazar. Secret: `GROQ_API_KEY` (`npx supabase secrets set`).
 - Flutter: `lib/widgets/voice_task_dialog.dart` (akış), `lib/services/voice_service.dart` (istemci), `lib/providers/voice_provider.dart`; kayıt `record` paketi (web: webm/opus blob, mobil: dosya).
 - `supabase/functions/todo-api` — API key ile REST (`x-api-key` / Bearer / `?api_key=`): tasks list/create/patch/delete/complete/postpone, `PATCH /subtasks/:id`, groups. Her yazma isteği grup üyeliğiyle yetkilendirilir (`assertTaskAccess`/`assertGroupAccess`). `api_keys` tablosu, `lib/services/api_key_service.dart`, `lib/widgets/ai_setup_dialog.dart` (menüde gizli).
 - `mcp_server/` — Node MCP server (stdio), `todo-api` üzerinden çalışan ince istemci; kullanıcı kendi `TODO_API_KEY`'i ile bağlar (service key gerekmez). Kurulum: `mcp_server/README.md`.
@@ -61,7 +61,7 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 - Yeni ekran/dialog eklerken `DesktopDialog` sistemini kullan, Material `showDialog` değil
 - Renk için `AppTheme` + `currentOwnerColorProvider`; sabit renk kullanma
 - Animasyon süreleri `lib/theme/animation_constants.dart` (`Anim`) içinden
-- Testler `test/` altında az (animation_test, widget_test); davranış değişikliğinde `flutter analyze` yeterli sayılıyor
+- Testler: `flutter test` (animation, task_drag bölge hesabı, tasksProvider refresh/optimistic). Ses prompt regresyonu: `VOICE_EVAL_JWT=<token> python scripts/voice_eval/run.py` — `cases.json` gerçek kayıtlardan kurulur, prompt değişikliğinden sonra 40/40 beklenir.
 
 ## Notlar
 - `DEVELOPMENT_LOG.md` kilometre taşları; güncel gerçek kaynak bu dosya + changelog.dart

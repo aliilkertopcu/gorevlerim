@@ -42,6 +42,22 @@ function reply(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
 }
 
+// Groq free tier is rate limited per minute (429). Retry with backoff before giving up.
+async function fetchWithRetry(input: string, init: RequestInit, label: string, attempts = 4): Promise<Response> {
+  let last: Response | null = null;
+  for (let i = 0; i < attempts; i++) {
+    const res = await fetch(input, init);
+    if (res.status !== 429 && res.status < 500) return res;
+    last = res;
+    const retryAfter = Number(res.headers.get("retry-after"));
+    const waitMs = Math.min(15000, (retryAfter > 0 ? retryAfter * 1000 : 1500 * 2 ** i));
+    console.warn(`${label}: ${res.status}, retrying in ${waitMs}ms`);
+    await res.body?.cancel();
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
+  return last!;
+}
+
 function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -74,12 +90,13 @@ async function transcribe(file: File, fallbackDuration: number, vocabulary: stri
   const vocab = vocabulary.length ? `Kişiler ve terimler: ${vocabulary.join(", ")}. ` : "";
   form.append("prompt", `${vocab}Bugünkü görevler: çamaşırları makineye at, bulaşık makinesini boşalt, mutfağı topla. Ana başlık: taahhüt işleri. Alt görev: internet aboneliği anlaşmasını yap. Yarına iş: faturayı yatır.`);
 
-  const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+  const res = await fetchWithRetry("https://api.groq.com/openai/v1/audio/transcriptions", {
     method: "POST",
     headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
     body: form,
-  });
+  }, "STT");
 
+  if (res.status === 429) throw new Error("Ses tanıma şu an yoğun, birkaç saniye sonra tekrar dene");
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(`STT failed (${res.status}): ${detail.slice(0, 300)}`);
@@ -148,7 +165,11 @@ YAPI İŞARETLERİ (en önemli kural): Kullanıcı konuşurken yapıyı sözle k
 - "alt görev Y", "birinci/ikinci/üçüncü alt görev Y", "bunun altına Y", "adımları: …", "şunları da içersin" → Y, EN SON açılan ana görevin ALT GÖREVİ olur. Yeni bir ana görev işareti gelene kadar sonraki maddeler de aynı ana görevin altına gider.
 - Tarih ifadeleri kapsamlıdır: "bugüne", "yarına iş", "cumaya", "haftaya" gibi bir ifade, kendisinden SONRA gelen görev(ler)e uygulanır; yeni bir tarih ifadesi gelene kadar geçerlidir. "bugün" = ${today}; "yarın", "cuma", "haftaya", "ayın 15'i" ifadelerini ${today} tarihine göre YYYY-MM-DD yap.
 
-ÖRNEK
+- GERİYE DÖNÜK gruplama: "bunu/bunları X'in işi olarak üst başlık altına ekle", "hepsini X başlığı altına koy", "bunlar X'in altına" gibi bir talimat, kendisinden ÖNCE sayılan maddeleri de kapsar; o ana kadar açılmış bir ana görev yoksa kayıttaki tüm düz maddeler (öncekiler ve sonrakiler) X adlı ana görevin alt görevleri olur.
+
+GÖREV SAYILAN İFADELER: emir kipi ("balkonu yıka"), gelecek zaman ("odamı toplayacağım"), EDİLGEN gelecek zaman ("balkonlar yıkanacak", "çamaşırlar dürülecek", "ütü yapılacak", "bir saat uyunacak"), "-nın yapılması / -nın alınması" ad tamlamaları, "… lazım / … gerekiyor". Bunların HEPSİ görevdir; asla ignored'a gitmez. Edilgen/ad tamlaması kalıplarını emir kipine çevir: "Balkonlar yıkanacak" → "Balkonları yıka", "faturanın yatırılması" → "Faturayı yatır", "bir saat uyulacak" → "Bir saat uyu".
+
+ÖRNEK 1
 Metin: "Bugüne yeni görev. Ana başlık taahhüt işleri. Alt görev, muayenehanenin internet aboneliğinin yapılması. İkinci alt görev, Türk Telekom hattımın ne zaman bittiğinin netleştirilmesi. Bugünün yeni işi, arabanın temizlenmesi. Yarına iş, asansör bakım faturasının yatırılması."
 Çıktı: tasks = [
   {title: "Taahhüt işleri", date: ${today}, subtasks: ["Muayenehanenin internet aboneliğini yap", "Türk Telekom hattının bitiş tarihini netleştir"]},
@@ -156,11 +177,18 @@ Metin: "Bugüne yeni görev. Ana başlık taahhüt işleri. Alt görev, muayeneh
   {title: "Asansör bakım faturasını yatır", date: <${today} + 1 gün>, subtasks: []}
 ], ignored = []
 
+ÖRNEK 2 (geriye dönük gruplama + edilgen kalıplar)
+Metin: "Balkonlar yıkanacak. Kendi odamı toplayacağım. Ama bunu Neslihan'ın işi olarak bir üst başlık üzerinde alt başlık olarak ekleyebilirsin. Çamaşırlar dürülecek, ütü yapılacak. Bir de bir saat uyulacak."
+Çıktı: tasks = [
+  {title: "Neslihan'ın işleri", date: ${viewDate}, subtasks: ["Balkonları yıka", "Odamı topla", "Çamaşırları dür", "Ütü yap", "Bir saat uyu"]}
+], ignored = []
+
 DİĞER KURALLAR:
 - Yapı işareti yoksa: birbirinden bağımsız işler (çamaşır at, bulaşık makinesini boşalt) AYRI görevlerdir; bir işin doğal adımları (market → süt, ekmek) alt görevlerdir.
-- Sohbet, düşünce, arka plandaki kişilere/hayvanlara söylenen sözler ("dur", "köpek yapma") görev değildir; bunları ignored'a koy. Sadece hiç anlam verilemeyen parçaları ignored'a koy; iş gibi görünen ifadeyi yanlış duyulmuş olsa bile DÜŞÜRME ("tüm makinesini yerleştir" → "Ütü makinesini yerleştir").
+- ignored SADECE şunlar için: sohbet, düşünce, arka plandaki kişilere/hayvanlara söylenen sözler ("dur", "köpek yapma"), hiç anlam verilemeyen parçalar. Bir eylem anlatan hiçbir cümle ignored'a gitmez; yanlış duyulmuş olsa bile en makul düzeltmeyle görev yap ("tüm makinesini yerleştir" → "Ütü makinesini yerleştir"). Kendine sor: "Bu cümle yapılacak bir iş mi?" Evetse görevdir.
 - Başlıklar Türkçe dil bilgisine uygun, kısa, emir kipinde; "-nın yapılması" gibi ad tamlamalarını emir kipine çevir ("faturanın yatırılması" → "Faturayı yatır"). Nesne ekleri doğru ("Mutfağı topla"). İlk harf büyük, sonda nokta yok.
 - description: başlığın tekrarı ya da farklı çekimi ASLA yazılmaz. Sadece başlığa sığmayan gerçek ek bilgi (kim, nerede, hangi şart) varsa yaz; yoksa boş string. Görevin hemen ardından gelen açıklayıcı cümle description'a gider, ignored'a değil.
+- Aynı işi anlatan ARDIŞIK cümleler tek görevdir: "Robot süpürgeye bakacağız. Tamirat, bakım yapacağız." → tek görev "Robot süpürgeyi incele ve onar" (ikinci cümle description'a gidebilir). Yeni görev ancak yeni bir iş/nesne ya da yapı işaretiyle başlar.
 - Aynı görevi iki kez yazma; kullanıcı kendini düzeltirse ("yok onu iptal et") son halini al.
 - Konuşmada hiç görev yoksa tasks boş dizi olsun.
 - Sadece şemaya uygun JSON döndür.`;
@@ -172,7 +200,7 @@ interface Proposal {
 }
 
 async function extractTasks(transcript: string, viewDate: string, groupName: string): Promise<Proposal> {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetchWithRetry("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${GROQ_API_KEY}`,
@@ -180,7 +208,7 @@ async function extractTasks(transcript: string, viewDate: string, groupName: str
     },
     body: JSON.stringify({
       model: LLM_MODEL,
-      temperature: 0.2,
+      temperature: 0.1,
       messages: [
         { role: "system", content: buildSystemPrompt(viewDate, groupName) },
         { role: "user", content: transcript },
@@ -190,8 +218,9 @@ async function extractTasks(transcript: string, viewDate: string, groupName: str
         json_schema: { name: "task_proposal", strict: true, schema: taskSchema },
       },
     }),
-  });
+  }, "LLM");
 
+  if (res.status === 429) throw new Error("Yapay zeka şu an yoğun, birkaç saniye sonra tekrar dene");
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(`LLM failed (${res.status}): ${detail.slice(0, 300)}`);
@@ -269,11 +298,34 @@ async function vocabularyFor(userId: string, groupId: string | null): Promise<st
       if (n) names.add(n);
     }
   }
-  // First names only, de-duplicated, capped
-  return [...names]
+  const people = [...names]
     .map((n) => n.trim().split(/\s+/)[0])
     .filter((n) => n.length > 1)
     .slice(0, 12);
+
+  // Personal vocabulary: distinctive words from the user's recent task titles
+  // (brands, places, proper nouns) — helps Whisper with "Suzuki", "muayenehane".
+  const terms = new Set<string>();
+  if (groupIds.length) {
+    const recent = await supabase
+      .from("tasks")
+      .select("title")
+      .in("owner_id", groupIds)
+      .order("created_at", { ascending: false })
+      .limit(150);
+    const stop = new Set(["için", "veya", "daha", "bir", "ile", "olan", "gibi", "sonra", "önce", "yeni", "yap", "et", "al"]);
+    for (const row of recent.data ?? []) {
+      for (const raw of String(row.title ?? "").split(/[\s,.;:!?()"]+/)) {
+        const w = raw.replace(/['’].*$/, "").trim();
+        if (w.length < 4 || stop.has(w.toLowerCase())) continue;
+        // keep capitalised words (names/brands) and long rare-looking words
+        if (/^[A-ZÇĞİÖŞÜ]/.test(w) || w.length >= 9) terms.add(w);
+      }
+      if (terms.size >= 25) break;
+    }
+  }
+  const termList = [...terms].filter((t) => !people.includes(t)).slice(0, 25);
+  return [...people, ...termList];
 }
 
 // ---------- Audio archive (temporary, for prompt tuning) ----------
