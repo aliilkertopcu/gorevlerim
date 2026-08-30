@@ -138,25 +138,69 @@ const taskSchema = {
         additionalProperties: false,
       },
     },
+    actions: {
+      type: "array",
+      description: "Changes to EXISTING tasks referenced by id from the context list",
+      items: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: ["complete", "uncomplete", "postpone", "delete", "complete_subtask"] },
+          task_id: { type: "string" },
+          subtask_id: { type: "string", description: "only for complete_subtask, else empty string" },
+          target_date: { type: "string", description: "YYYY-MM-DD for postpone, else empty string" },
+        },
+        required: ["type", "task_id", "subtask_id", "target_date"],
+        additionalProperties: false,
+      },
+    },
     ignored: {
       type: "array",
       items: { type: "string" },
       description: "Transcript fragments that were not tasks",
     },
   },
-  required: ["tasks", "ignored"],
+  required: ["tasks", "actions", "ignored"],
   additionalProperties: false,
 };
 
-function buildSystemPrompt(viewDate: string, groupName: string): string {
+interface ContextSubtask { id: string; title: string; status: string }
+interface ContextTask { id: string; title: string; status: string; date?: string; subtasks: ContextSubtask[] }
+
+function renderContext(tasks: ContextTask[]): string {
+  if (!tasks.length) return "";
+  const lines = tasks.slice(0, 60).map((t) => {
+    const st = t.status === "completed" ? "✓" : t.status === "blocked" ? "⛔" : "○";
+    const subs = (t.subtasks ?? [])
+      .slice(0, 20)
+      .map((s) => `    - [subtask_id=${s.id}] ${s.status === "completed" ? "✓" : "○"} ${s.title}`)
+      .join("\n");
+    return `  - [task_id=${t.id}] ${st} ${t.title}${t.date ? ` (${t.date})` : ""}${subs ? "\n" + subs : ""}`;
+  });
+  return `\nMEVCUT GÖREVLER (kullanıcının şu an baktığı liste; ○ bekliyor, ✓ tamamlandı):\n${lines.join("\n")}\n`;
+}
+
+function buildSystemPrompt(viewDate: string, groupName: string, context: ContextTask[]): string {
   const today = todayISO();
   const groupLine = groupName
     ? `Görevler "${groupName}" adlı listeye eklenecek; bu listenin adı zaten bağlamı verir, aynı adla bir üst görev UYDURMA.`
     : "";
-  return `Sen bir görev asistanısın. Kullanıcı Türkçe konuşarak yapacağı işleri anlatıyor; sen bu konuşmadan yapılandırılmış görev listesi çıkarıyorsun.
+  const contextBlock = renderContext(context);
+  const actionRules = context.length
+    ? `
+MEVCUT GÖREVLER ÜZERİNDE İŞLEM (actions): Kullanıcı yukarıdaki listedeki bir görevden bahsediyorsa YENİ GÖREV AÇMA, actions'a yaz:
+- "X tamamlandı / bitti / yaptım / hallettim / X'i işaretle" → {type:"complete", task_id}
+- "X aslında bitmedi / geri al" → {type:"uncomplete", task_id}
+- "X'i yarına/cumaya ertele, X'i sonraya bırak" → {type:"postpone", task_id, target_date: YYYY-MM-DD}
+- "X'i sil / iptal et / kaldır" → {type:"delete", task_id}
+- Bir ALT görev tamamlandıysa → {type:"complete_subtask", task_id, subtask_id}
+Eşleştirme: söylenen ifade ile listedeki başlık aynı işi anlatıyorsa eşleştir (kelime birebir olmak zorunda değil: "süpürge" → "Xiaomi robot süpürgenin arızasını incele"). Listede karşılığı yoksa aksiyon ÜRETME, gerekiyorsa yeni görev olarak ekle. task_id/subtask_id yalnızca listedeki id'lerden olabilir; asla uydurma. Kullanılmayan alanlar boş string.
+`
+    : "";
+  return `Sen bir görev asistanısın. Kullanıcı Türkçe konuşarak yapacağı işleri anlatıyor; sen bu konuşmadan yapılandırılmış görev listesi çıkarıyorsun ve mevcut görevler üzerinde istediği değişiklikleri belirliyorsun.
 
 Bugünün tarihi: ${today}. Kullanıcının uygulamada baktığı gün: ${viewDate}. Tarih söylenmeyen görevleri ${viewDate} tarihine koy.
 ${groupLine}
+${contextBlock}${actionRules}
 
 Metin otomatik ses tanımadan geliyor; yanlış duyulmuş kelimeler olabilir. Bağlamdan açıkça anlaşılan hataları düzelt ("İstanbul'a giriş için hazırlanan çanta" → "İstanbul'a gidiş", "mutfak topla" → "mutfağı topla"). Emin olmadığın yerde metne sadık kal.
 
@@ -190,16 +234,25 @@ DİĞER KURALLAR:
 - description: başlığın tekrarı ya da farklı çekimi ASLA yazılmaz. Sadece başlığa sığmayan gerçek ek bilgi (kim, nerede, hangi şart) varsa yaz; yoksa boş string. Görevin hemen ardından gelen açıklayıcı cümle description'a gider, ignored'a değil.
 - Aynı işi anlatan ARDIŞIK cümleler tek görevdir: "Robot süpürgeye bakacağız. Tamirat, bakım yapacağız." → tek görev "Robot süpürgeyi incele ve onar" (ikinci cümle description'a gidebilir). Yeni görev ancak yeni bir iş/nesne ya da yapı işaretiyle başlar.
 - Aynı görevi iki kez yazma; kullanıcı kendini düzeltirse ("yok onu iptal et") son halini al.
-- Konuşmada hiç görev yoksa tasks boş dizi olsun.
+- Konuşmada hiç görev yoksa tasks boş dizi olsun; hiç değişiklik yoksa actions boş dizi olsun.
 - Sadece şemaya uygun JSON döndür.`;
 }
 
+interface ProposalAction {
+  type: "complete" | "uncomplete" | "postpone" | "delete" | "complete_subtask";
+  task_id: string;
+  subtask_id: string;
+  target_date: string;
+  title?: string;
+  subtask_title?: string;
+}
 interface Proposal {
   tasks: { title: string; description: string; date: string; subtasks: string[] }[];
+  actions: ProposalAction[];
   ignored: string[];
 }
 
-async function extractTasks(transcript: string, viewDate: string, groupName: string): Promise<Proposal> {
+async function extractTasks(transcript: string, viewDate: string, groupName: string, context: ContextTask[]): Promise<Proposal> {
   const res = await fetchWithRetry("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -210,7 +263,7 @@ async function extractTasks(transcript: string, viewDate: string, groupName: str
       model: LLM_MODEL,
       temperature: 0.1,
       messages: [
-        { role: "system", content: buildSystemPrompt(viewDate, groupName) },
+        { role: "system", content: buildSystemPrompt(viewDate, groupName, context) },
         { role: "user", content: transcript },
       ],
       response_format: {
@@ -240,6 +293,35 @@ async function extractTasks(transcript: string, viewDate: string, groupName: str
     }))
     .filter((t) => t.title.length > 0);
   parsed.ignored = (parsed.ignored ?? []).map((s) => (s ?? "").trim()).filter(Boolean);
+
+  // Validate actions against the provided context — never trust invented ids
+  const byId = new Map(context.map((t) => [t.id, t]));
+  const seen = new Set<string>();
+  parsed.actions = (parsed.actions ?? [])
+    .map((a) => {
+      const task = byId.get(a.task_id);
+      if (!task) return null;
+      const sub = a.type === "complete_subtask"
+        ? (task.subtasks ?? []).find((x) => x.id === a.subtask_id)
+        : undefined;
+      if (a.type === "complete_subtask" && !sub) return null;
+      const targetDate = a.type === "postpone" && /^\d{4}-\d{2}-\d{2}$/.test(a.target_date ?? "")
+        ? a.target_date
+        : "";
+      if (a.type === "postpone" && !targetDate) return null;
+      const key = `${a.type}:${a.task_id}:${a.subtask_id ?? ""}`;
+      if (seen.has(key)) return null;
+      seen.add(key);
+      return {
+        type: a.type,
+        task_id: task.id,
+        subtask_id: sub?.id ?? "",
+        target_date: targetDate,
+        title: task.title,
+        subtask_title: sub?.title,
+      } as ProposalAction;
+    })
+    .filter((a): a is ProposalAction => a !== null);
   return parsed;
 }
 
@@ -384,6 +466,30 @@ Deno.serve(async (req) => {
     const viewDateRaw = String(form.get("date") ?? "");
     const viewDate = /^\d{4}-\d{2}-\d{2}$/.test(viewDateRaw) ? viewDateRaw : todayISO();
     const groupName = String(form.get("group_name") ?? "").trim().slice(0, 80);
+    let context: ContextTask[] = [];
+    try {
+      const raw = String(form.get("context_tasks") ?? "");
+      if (raw) {
+        const parsedCtx = JSON.parse(raw);
+        if (Array.isArray(parsedCtx)) {
+          context = parsedCtx
+            .filter((t) => t && typeof t.id === "string" && typeof t.title === "string")
+            .slice(0, 60)
+            .map((t) => ({
+              id: t.id,
+              title: String(t.title).slice(0, 200),
+              status: String(t.status ?? "pending"),
+              date: typeof t.date === "string" ? t.date : undefined,
+              subtasks: Array.isArray(t.subtasks)
+                ? t.subtasks
+                    .filter((x: { id?: unknown; title?: unknown }) => typeof x?.id === "string" && typeof x?.title === "string")
+                    .slice(0, 20)
+                    .map((x: { id: string; title: string; status?: string }) => ({ id: x.id, title: String(x.title).slice(0, 200), status: String(x.status ?? "pending") }))
+                : [],
+            }));
+        }
+      }
+    } catch (_) { /* ignore malformed context */ }
     const groupIdRaw = String(form.get("group_id") ?? "");
     const groupId = /^[0-9a-f-]{36}$/i.test(groupIdRaw) ? groupIdRaw : null;
 
@@ -424,7 +530,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const proposal = await extractTasks(transcript.text, viewDate, groupName);
+    const proposal = await extractTasks(transcript.text, viewDate, groupName, context);
 
     // Keep history for review/debugging (+ the audio clip while we tune prompts)
     const { data: hist, error: histErr } = await supabase.from("voice_transcripts").insert({
@@ -447,6 +553,7 @@ Deno.serve(async (req) => {
     return reply({
       transcript: transcript.text,
       tasks: proposal.tasks,
+      actions: proposal.actions,
       ignored: proposal.ignored,
       used_seconds: usedAfter,
       limit_seconds: limit,

@@ -15,6 +15,13 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.34.0',
+    date: '2026-08-30',
+    features: [
+      'Sesle mevcut görevleri yönet: "arabayı yıkadım, bitti", "robot süpürgeyi yarına ertele", "çiçekleri sulamayı sil", "Vodafone tarifesini seçtim" — tamamlama, geri alma, erteleme, silme ve alt görev tamamlama önizlemede işaretli listelenir, onayda uygulanır',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.33.2',
     date: '2026-08-30',
     features: [

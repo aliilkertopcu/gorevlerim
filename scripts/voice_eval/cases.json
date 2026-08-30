@@ -106,5 +106,78 @@
       ],
       "ignored_max": 1
     }
+  },
+  {
+    "id": "actions-complete-postpone-delete",
+    "source": "synthetic — acting on existing tasks",
+    "group_name": "🏡 Ev İşleri",
+    "date": "+0",
+    "context_tasks": [
+      {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "title": "Suzuki'yi temizle",
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "22222222-2222-2222-2222-222222222222",
+        "title": "Xiaomi robot süpürgenin arızasını incele ve onar",
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "33333333-3333-3333-3333-333333333333",
+        "title": "Taahhüt işleri",
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "title": "Vodafone tarifesini seç",
+            "status": "pending"
+          },
+          {
+            "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "title": "Türk Telekom hattının bitiş tarihini netleştir",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "44444444-4444-4444-4444-444444444444",
+        "title": "Çiçekleri sula",
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "transcript": "Arabayı yıkadım, o bitti. Robot süpürgeyi yarına erteleyelim. Çiçekleri sulamayı sil, yağmur yağdı. Vodafone tarifesini de seçtim. Bir de yeni iş: kütüphaneye kitapları iade et.",
+    "expect": {
+      "task_count": 1,
+      "tasks": [
+        {
+          "title_contains": "kitap",
+          "subtask_count": 0
+        }
+      ],
+      "actions": [
+        {
+          "type": "complete",
+          "title_contains": "suzuki"
+        },
+        {
+          "type": "postpone",
+          "title_contains": "xiaomi",
+          "target_date": "+1"
+        },
+        {
+          "type": "delete",
+          "title_contains": "çiçek"
+        },
+        {
+          "type": "complete_subtask",
+          "title_contains": "taahhüt"
+        }
+      ],
+      "ignored_max": 1
+    }
   }
 ]

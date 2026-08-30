@@ -23,6 +23,7 @@ def call(url, jwt, case):
         "transcript": case["transcript"],
         "date": resolve_date(case.get("date", "+0")),
         "group_name": case.get("group_name", ""),
+        "context_tasks": json.dumps(case.get("context_tasks", []), ensure_ascii=False) if case.get("context_tasks") else "",
     }
     body = b""
     for k, v in fields.items():
@@ -34,6 +35,10 @@ def call(url, jwt, case):
     })
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.load(r)
+
+
+def a_str(a):
+    return f"{a['type']} {a.get('title')} {a.get('subtask_title') or ''} {a.get('target_date') or ''}".strip()
 
 
 def tr_lower(s):
@@ -62,6 +67,15 @@ def score(case, result):
         checks.append((name, bool(ok), detail))
 
     chk("task_count", len(tasks) == exp["task_count"], f"got {len(tasks)}, want {exp['task_count']}")
+    if "actions" in exp:
+        acts = result.get("actions", [])
+        chk("action_count", len(acts) == len(exp["actions"]), f"got {[(a['type'], a.get('title')) for a in acts]}")
+        for ea in exp["actions"]:
+            m = next((a for a in acts if a["type"] == ea["type"] and tr_lower(ea["title_contains"]) in tr_lower(a.get("title"))), None)
+            chk(f"action {ea['type']}~{ea['title_contains']}", m is not None, "missing" if m is None else a_str(m))
+            if m and "target_date" in ea:
+                want = resolve_date(ea["target_date"])
+                chk(f"  target[{ea['title_contains']}]", m.get("target_date") == want, f"got {m.get('target_date')}, want {want}")
     if "ignored_max" in exp:
         chk("ignored_max", len(ignored) <= exp["ignored_max"], f"got {len(ignored)}: {ignored}")
     for e in exp.get("tasks", []):

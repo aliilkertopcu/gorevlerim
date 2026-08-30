@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import '../models/task.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
@@ -233,6 +235,7 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
             viewDate: ref.read(selectedDateProvider),
             groupId: ref.read(currentGroupProvider)?.id,
             groupName: ref.read(currentGroupProvider)?.name,
+            contextTasksJson: _contextTasksJson(),
           );
 
       if (!mounted) return;
@@ -257,12 +260,66 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
     }
   }
 
+  /// Current day's tasks as compact JSON so the model can act on existing items.
+  String _contextTasksJson() {
+    final tasks = ref.read(tasksProvider).value ?? const <Task>[];
+    final list = tasks.take(60).map((t) => {
+          'id': t.id,
+          'title': t.title,
+          'status': t.status,
+          'date': '${t.date.year}-${t.date.month.toString().padLeft(2, '0')}-${t.date.day.toString().padLeft(2, '0')}',
+          'subtasks': t.subtasks
+              .take(20)
+              .map((s) => {'id': s.id, 'title': s.title, 'status': s.status})
+              .toList(),
+        }).toList();
+    return jsonEncode(list);
+  }
+
+  Future<void> _applyActions(List<VoiceActionProposal> actions) async {
+    final service = ref.read(taskServiceProvider);
+    final notifier = ref.read(tasksNotifierProvider.notifier);
+    final tasks = ref.read(tasksProvider).value ?? const <Task>[];
+    for (final a in actions) {
+      final task = tasks.where((t) => t.id == a.taskId).firstOrNull;
+      switch (a.type) {
+        case 'complete':
+          if (task != null && !task.isCompleted) {
+            notifier.optimisticToggleComplete(a.taskId);
+            await service.toggleComplete(a.taskId, false);
+          }
+          break;
+        case 'uncomplete':
+          if (task != null && task.isCompleted) {
+            notifier.optimisticToggleComplete(a.taskId);
+            await service.toggleComplete(a.taskId, true);
+          }
+          break;
+        case 'postpone':
+          if (a.targetDate != null) await service.postponeTask(a.taskId, a.targetDate!);
+          break;
+        case 'delete':
+          notifier.optimisticDeleteTask(a.taskId);
+          await service.deleteTask(a.taskId);
+          break;
+        case 'complete_subtask':
+          final sub = task?.subtasks.where((s) => s.id == a.subtaskId).firstOrNull;
+          if (sub != null && !sub.isCompleted) {
+            notifier.optimisticToggleSubtask(a.taskId, a.subtaskId);
+            await service.toggleSubtaskComplete(a.subtaskId, false);
+          }
+          break;
+      }
+    }
+  }
+
   // ---------- Save ----------
   Future<void> _saveTasks() async {
     final result = _result;
     if (result == null) return;
     final selected = result.tasks.where((t) => t.selected && t.title.trim().isNotEmpty).toList();
-    if (selected.isEmpty) return;
+    final selectedActions = result.actions.where((a) => a.selected).toList();
+    if (selected.isEmpty && selectedActions.isEmpty) return;
 
     final owner = ref.read(ownerContextProvider);
     final user = ref.read(currentUserProvider);
@@ -291,12 +348,17 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
               );
         }
       }
-      ref.invalidate(tasksStreamProvider);
+      await _applyActions(selectedActions);
+      refreshTasks(ref);
 
       if (!mounted) return;
       Navigator.of(context).pop();
+      final parts = <String>[
+        if (selected.isNotEmpty) '${selected.length} görev eklendi',
+        if (selectedActions.isNotEmpty) '${selectedActions.length} değişiklik uygulandı',
+      ];
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${selected.length} görev eklendi 🎤')),
+        SnackBar(content: Text('${parts.join(', ')} 🎤')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -599,13 +661,29 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
   Widget _buildPreview(BuildContext context) {
     final result = _result!;
     final color = ref.watch(currentOwnerColorProvider);
-    final selectedCount = result.tasks.where((t) => t.selected).length;
+    final selectedCount = result.tasks.where((t) => t.selected).length +
+        result.actions.where((a) => a.selected).length;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (result.tasks.isEmpty) ...[
+        if (result.actions.isNotEmpty) ...[
+          Text(
+            '${result.actions.length} değişiklik — mevcut görevlerde:',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 4),
+          for (final a in result.actions)
+            _ActionTile(
+              key: ValueKey('action_${a.type}_${a.taskId}_${a.subtaskId}'),
+              action: a,
+              color: color,
+              onChanged: () => setState(() {}),
+            ),
+          const SizedBox(height: 8),
+        ],
+        if (result.tasks.isEmpty && result.actions.isEmpty) ...[
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Text(
@@ -613,7 +691,7 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
               textAlign: TextAlign.center,
             ),
           ),
-        ] else ...[
+        ] else if (result.tasks.isNotEmpty) ...[
           Text(
             '${result.tasks.length} görev bulundu — eklemek istediklerini seç, gerekirse düzenle:',
             style: Theme.of(context).textTheme.bodySmall,
@@ -674,7 +752,7 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
             ElevatedButton.icon(
               onPressed: selectedCount == 0 ? null : _saveTasks,
               icon: const Icon(Icons.check, size: 18),
-              label: Text(selectedCount == 0 ? 'Ekle' : '$selectedCount görevi ekle'),
+              label: Text(selectedCount == 0 ? 'Uygula' : '$selectedCount öğeyi uygula'),
               style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: Colors.white),
             ),
           ],
@@ -882,6 +960,72 @@ class _ProposalTileState extends State<_ProposalTile> {
                   ],
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final VoiceActionProposal action;
+  final Color color;
+  final VoidCallback onChanged;
+
+  const _ActionTile({super.key, required this.action, required this.color, required this.onChanged});
+
+  IconData get _icon {
+    switch (action.type) {
+      case 'complete':
+      case 'complete_subtask':
+        return Icons.check_circle_outline;
+      case 'uncomplete':
+        return Icons.undo;
+      case 'postpone':
+        return Icons.event;
+      case 'delete':
+        return Icons.delete_outline;
+    }
+    return Icons.edit;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dateFmt = DateFormat('d MMM EEE', 'tr_TR');
+    final suffix = action.type == 'postpone' && action.targetDate != null
+        ? ' → ${dateFmt.format(action.targetDate!)}'
+        : '';
+    return AnimatedOpacity(
+      duration: Anim.fast,
+      opacity: action.selected ? 1 : 0.5,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: action.selected ? 0.08 : 0.03),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Checkbox(
+              value: action.selected,
+              activeColor: color,
+              onChanged: (v) {
+                action.selected = v ?? true;
+                onChanged();
+              },
+            ),
+            Icon(_icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                '${action.label}$suffix',
+                style: theme.textTheme.bodyMedium,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
           ],
         ),
       ),

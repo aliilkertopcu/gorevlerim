@@ -34,9 +34,58 @@ class VoiceTaskProposal {
   }
 }
 
+/// A proposed change to an existing task (complete / postpone / delete ...).
+class VoiceActionProposal {
+  final String type; // complete | uncomplete | postpone | delete | complete_subtask
+  final String taskId;
+  final String subtaskId;
+  final DateTime? targetDate;
+  final String title;
+  final String? subtaskTitle;
+  bool selected;
+
+  VoiceActionProposal({
+    required this.type,
+    required this.taskId,
+    required this.subtaskId,
+    required this.targetDate,
+    required this.title,
+    this.subtaskTitle,
+    this.selected = true,
+  });
+
+  factory VoiceActionProposal.fromJson(Map<String, dynamic> json) {
+    return VoiceActionProposal(
+      type: json['type'] as String? ?? '',
+      taskId: json['task_id'] as String? ?? '',
+      subtaskId: json['subtask_id'] as String? ?? '',
+      targetDate: DateTime.tryParse(json['target_date'] as String? ?? ''),
+      title: json['title'] as String? ?? '',
+      subtaskTitle: json['subtask_title'] as String?,
+    );
+  }
+
+  String get label {
+    switch (type) {
+      case 'complete':
+        return 'Tamamla: $title';
+      case 'uncomplete':
+        return 'Geri al: $title';
+      case 'postpone':
+        return 'Ertele: $title';
+      case 'delete':
+        return 'Sil: $title';
+      case 'complete_subtask':
+        return 'Alt görevi tamamla: ${subtaskTitle ?? ''} ($title)';
+    }
+    return '$type: $title';
+  }
+}
+
 class VoiceResult {
   final String transcript;
   final List<VoiceTaskProposal> tasks;
+  final List<VoiceActionProposal> actions;
   final List<String> ignored;
   final int usedSeconds;
   final int limitSeconds;
@@ -45,6 +94,7 @@ class VoiceResult {
   const VoiceResult({
     required this.transcript,
     required this.tasks,
+    this.actions = const [],
     required this.ignored,
     required this.usedSeconds,
     required this.limitSeconds,
@@ -135,6 +185,7 @@ class VoiceService {
     required DateTime viewDate,
     String? groupId,
     String? groupName,
+    String? contextTasksJson,
   }) async {
     final token = _token;
     if (token == null) throw Exception('Oturum bulunamadı');
@@ -145,6 +196,7 @@ class VoiceService {
       ..fields['date'] = _dateKey(viewDate)
       ..fields['group_id'] = groupId ?? ''
       ..fields['group_name'] = groupName ?? ''
+      ..fields['context_tasks'] = contextTasksJson ?? ''
       ..files.add(http.MultipartFile.fromBytes(
         'file',
         audioBytes,
@@ -172,6 +224,10 @@ class VoiceService {
       tasks: (json['tasks'] as List<dynamic>? ?? [])
           .map((t) => VoiceTaskProposal.fromJson(t as Map<String, dynamic>, viewDate))
           .where((t) => t.title.isNotEmpty)
+          .toList(),
+      actions: (json['actions'] as List<dynamic>? ?? [])
+          .map((a) => VoiceActionProposal.fromJson(a as Map<String, dynamic>))
+          .where((a) => a.taskId.isNotEmpty)
           .toList(),
       ignored: (json['ignored'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
       usedSeconds: json['used_seconds'] as int? ?? 0,
