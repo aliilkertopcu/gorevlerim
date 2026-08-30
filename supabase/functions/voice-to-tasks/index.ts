@@ -23,7 +23,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") ?? "";
-const STT_MODEL = Deno.env.get("GROQ_STT_MODEL") ?? "whisper-large-v3-turbo";
+const STT_MODEL = Deno.env.get("GROQ_STT_MODEL") ?? "whisper-large-v3";
+const KEEP_AUDIO = (Deno.env.get("VOICE_KEEP_AUDIO") ?? "true") !== "false"; // store clips for prompt tuning
+const AUDIO_BUCKET = "voice-audio";
 const LLM_MODEL = Deno.env.get("GROQ_LLM_MODEL") ?? "qwen/qwen3.8-27b";
 const DAILY_LIMIT = Number(Deno.env.get("VOICE_DAILY_LIMIT_SEC") ?? "600");
 const MAX_CLIP = Number(Deno.env.get("VOICE_MAX_CLIP_SEC") ?? "600");
@@ -60,15 +62,17 @@ interface Transcript {
   durationSec: number;
 }
 
-async function transcribe(file: File, fallbackDuration: number): Promise<Transcript> {
+async function transcribe(file: File, fallbackDuration: number, vocabulary: string[]): Promise<Transcript> {
   const form = new FormData();
   form.append("file", file, file.name || "audio.webm");
   form.append("model", STT_MODEL);
   form.append("language", "tr");
   form.append("response_format", "verbose_json");
   form.append("temperature", "0");
-  // Style/vocabulary hint: proper Turkish punctuation and typical task phrasing
-  form.append("prompt", "Bugünkü görevler: çamaşırları makineye at, bulaşık makinesini boşalt, mutfağı topla, çiçekleri sula, çalışma odasını düzenle. Yarın diş hekimine git.");
+  // Style/vocabulary hint: proper Turkish punctuation, task phrasing, and the
+  // names/terms this user actually uses (group members, recent task words).
+  const vocab = vocabulary.length ? `Kişiler ve terimler: ${vocabulary.join(", ")}. ` : "";
+  form.append("prompt", `${vocab}Bugünkü görevler: çamaşırları makineye at, bulaşık makinesini boşalt, mutfağı topla. Ana başlık: taahhüt işleri. Alt görev: internet aboneliği anlaşmasını yap. Yarına iş: faturayı yatır.`);
 
   const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
     method: "POST",
@@ -139,13 +143,24 @@ ${groupLine}
 
 Metin otomatik ses tanımadan geliyor; yanlış duyulmuş kelimeler olabilir. Bağlamdan açıkça anlaşılan hataları düzelt ("İstanbul'a giriş için hazırlanan çanta" → "İstanbul'a gidiş", "mutfak topla" → "mutfağı topla"). Emin olmadığın yerde metne sadık kal.
 
-Kurallar:
-- Sadece yapılacak iş niteliğindeki ifadeleri görev yap. Sohbet, düşünce, arka plandaki kişilere veya hayvanlara söylenen sözler ("dur", "köpek yapma", "bir saniye"), tekrarlar ve dolgu kelimeleri görev DEĞİLDİR; bunları "ignored" listesine kısa parçalar halinde koy.
-- Hiyerarşi kuralı: Birbirinden bağımsız işler (çamaşır at, bulaşık makinesini boşalt, çiçekleri sula) AYRI görevlerdir; hepsini tek bir uydurma başlık altına gömme. Bir işin adımları veya parçaları (market → süt, ekmek; sunum → slaytlar, prova) o işin ALT GÖREVLERİDİR. Kullanıcı "alt görev", "bunun altına", "adımları" derse hiyerarşiyi onun dediği gibi kur.
-- Görev başlıkları Türkçe dil bilgisine uygun, kısa ve emir kipinde olsun; nesne ekleri doğru olsun ("Mutfağı topla", "Bulaşık makinesini boşalt", "Çiçekleri sula" — "Mutfak topla" değil). İlk harf büyük, sonda nokta yok. Açıklamaya sadece başlığa sığmayan gerçek detayı yaz; yoksa boş string.
-- Tarihleri çöz: "bugün" = ${today}; "yarın", "cuma", "haftaya", "ayın 15'i" gibi ifadeleri ${today} tarihine göre YYYY-MM-DD formatına çevir. Belirsizse ${viewDate}.
-- Bir görevin hemen ardından gelen açıklayıcı cümle ("…, İstanbul'a gidiş için hazırlanan çantalar") o görevin description alanına yazılır; ignored'a atılmaz.
-- Yanlış duyulmuş olsa bile iş gibi görünen ifadeyi DÜŞÜRME; en makul düzeltmeyle görev yap ("tüm makinesini yerleştir" → "Ütü makinesini yerleştir"). Sadece hiç anlam verilemeyen parçaları ignored'a koy.
+YAPI İŞARETLERİ (en önemli kural): Kullanıcı konuşurken yapıyı sözle kurar. Bu ifadeler görev DEĞİLDİR, gürültü de DEĞİLDİR; birer KOMUTTUR ve ignored'a da yazılmaz:
+- "ana başlık X", "ana görev X", "başlık X", "yeni görev X", "yeni iş X", "başka bir iş X", "bir de X" → X adında YENİ bir ana görev başlar.
+- "alt görev Y", "birinci/ikinci/üçüncü alt görev Y", "bunun altına Y", "adımları: …", "şunları da içersin" → Y, EN SON açılan ana görevin ALT GÖREVİ olur. Yeni bir ana görev işareti gelene kadar sonraki maddeler de aynı ana görevin altına gider.
+- Tarih ifadeleri kapsamlıdır: "bugüne", "yarına iş", "cumaya", "haftaya" gibi bir ifade, kendisinden SONRA gelen görev(ler)e uygulanır; yeni bir tarih ifadesi gelene kadar geçerlidir. "bugün" = ${today}; "yarın", "cuma", "haftaya", "ayın 15'i" ifadelerini ${today} tarihine göre YYYY-MM-DD yap.
+
+ÖRNEK
+Metin: "Bugüne yeni görev. Ana başlık taahhüt işleri. Alt görev, muayenehanenin internet aboneliğinin yapılması. İkinci alt görev, Türk Telekom hattımın ne zaman bittiğinin netleştirilmesi. Bugünün yeni işi, arabanın temizlenmesi. Yarına iş, asansör bakım faturasının yatırılması."
+Çıktı: tasks = [
+  {title: "Taahhüt işleri", date: ${today}, subtasks: ["Muayenehanenin internet aboneliğini yap", "Türk Telekom hattının bitiş tarihini netleştir"]},
+  {title: "Arabayı temizle", date: ${today}, subtasks: []},
+  {title: "Asansör bakım faturasını yatır", date: <${today} + 1 gün>, subtasks: []}
+], ignored = []
+
+DİĞER KURALLAR:
+- Yapı işareti yoksa: birbirinden bağımsız işler (çamaşır at, bulaşık makinesini boşalt) AYRI görevlerdir; bir işin doğal adımları (market → süt, ekmek) alt görevlerdir.
+- Sohbet, düşünce, arka plandaki kişilere/hayvanlara söylenen sözler ("dur", "köpek yapma") görev değildir; bunları ignored'a koy. Sadece hiç anlam verilemeyen parçaları ignored'a koy; iş gibi görünen ifadeyi yanlış duyulmuş olsa bile DÜŞÜRME ("tüm makinesini yerleştir" → "Ütü makinesini yerleştir").
+- Başlıklar Türkçe dil bilgisine uygun, kısa, emir kipinde; "-nın yapılması" gibi ad tamlamalarını emir kipine çevir ("faturanın yatırılması" → "Faturayı yatır"). Nesne ekleri doğru ("Mutfağı topla"). İlk harf büyük, sonda nokta yok.
+- description: başlığın tekrarı ya da farklı çekimi ASLA yazılmaz. Sadece başlığa sığmayan gerçek ek bilgi (kim, nerede, hangi şart) varsa yaz; yoksa boş string. Görevin hemen ardından gelen açıklayıcı cümle description'a gider, ignored'a değil.
 - Aynı görevi iki kez yazma; kullanıcı kendini düzeltirse ("yok onu iptal et") son halini al.
 - Konuşmada hiç görev yoksa tasks boş dizi olsun.
 - Sadece şemaya uygun JSON döndür.`;
@@ -230,6 +245,52 @@ async function recordUsage(userId: string, seconds: number): Promise<number> {
   return Number(data);
 }
 
+// ---------- Vocabulary for STT ----------
+// Names the user is likely to say: members of the target group (or all their groups).
+async function vocabularyFor(userId: string, groupId: string | null): Promise<string[]> {
+  const names = new Set<string>();
+  const me = await supabase.from("profiles").select("display_name").eq("id", userId).maybeSingle();
+  if (me.data?.display_name) names.add(me.data.display_name);
+
+  let groupIds: string[] = [];
+  if (groupId) {
+    groupIds = [groupId];
+  } else {
+    const mine = await supabase.from("group_members").select("group_id").eq("user_id", userId);
+    groupIds = (mine.data ?? []).map((m: { group_id: string }) => m.group_id);
+  }
+  if (groupIds.length) {
+    const members = await supabase
+      .from("group_members")
+      .select("profiles(display_name)")
+      .in("group_id", groupIds);
+    for (const m of members.data ?? []) {
+      const n = (m as { profiles?: { display_name?: string } }).profiles?.display_name;
+      if (n) names.add(n);
+    }
+  }
+  // First names only, de-duplicated, capped
+  return [...names]
+    .map((n) => n.trim().split(/\s+/)[0])
+    .filter((n) => n.length > 1)
+    .slice(0, 12);
+}
+
+// ---------- Audio archive (temporary, for prompt tuning) ----------
+async function storeAudio(userId: string, transcriptId: string, file: File): Promise<string | null> {
+  if (!KEEP_AUDIO) return null;
+  const ext = (file.name.split(".").pop() || "webm").toLowerCase();
+  const path = `${userId}/${transcriptId}.${ext}`;
+  const { error } = await supabase.storage
+    .from(AUDIO_BUCKET)
+    .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: true });
+  if (error) {
+    console.error("audio upload:", error.message);
+    return null;
+  }
+  return path;
+}
+
 // ---------- Handler ----------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -260,8 +321,12 @@ Deno.serve(async (req) => {
   try {
     const form = await req.formData();
     const file = form.get("file");
-    if (!(file instanceof File)) return reply({ error: "file alanı gerekli" }, 400);
-    if (file.size > MAX_BYTES) return reply({ error: "Ses dosyası 25 MB'den büyük" }, 413);
+    // Testing/tuning path: a ready transcript skips STT and the audio quota
+    const transcriptOverride = String(form.get("transcript") ?? "").trim();
+    if (!transcriptOverride) {
+      if (!(file instanceof File)) return reply({ error: "file alanı gerekli" }, 400);
+      if (file.size > MAX_BYTES) return reply({ error: "Ses dosyası 25 MB'den büyük" }, 413);
+    }
 
     const clientDuration = Math.ceil(Number(form.get("duration_seconds") ?? 0)) || 0;
     const viewDateRaw = String(form.get("date") ?? "");
@@ -276,7 +341,7 @@ Deno.serve(async (req) => {
 
     // Pre-check quota with the client-reported duration (cheap, avoids a wasted STT call)
     const usedBefore = await getUsedToday(userId);
-    if (usedBefore >= limit || usedBefore + clientDuration > limit) {
+    if (!transcriptOverride && (usedBefore >= limit || usedBefore + clientDuration > limit)) {
       return reply({
         error: "quota_exceeded",
         message: "Bugünkü ses kaydı limitin doldu. Yarın tekrar deneyebilirsin.",
@@ -285,10 +350,16 @@ Deno.serve(async (req) => {
       }, 429);
     }
 
-    const transcript = await transcribe(file, clientDuration);
-
-    // Record actual duration (server-measured), even if transcript is empty
-    const usedAfter = await recordUsage(userId, Math.max(transcript.durationSec, 1));
+    let transcript: Transcript;
+    let usedAfter = usedBefore;
+    if (transcriptOverride) {
+      transcript = { text: cleanTranscript(transcriptOverride), durationSec: 0 };
+    } else {
+      const vocabulary = await vocabularyFor(userId, groupId);
+      transcript = await transcribe(file as File, clientDuration, vocabulary);
+      // Record actual duration (server-measured), even if transcript is empty
+      usedAfter = await recordUsage(userId, Math.max(transcript.durationSec, 1));
+    }
 
     if (!transcript.text) {
       return reply({
@@ -303,17 +374,23 @@ Deno.serve(async (req) => {
 
     const proposal = await extractTasks(transcript.text, viewDate, groupName);
 
-    // Keep history for review/debugging
-    const { error: histErr } = await supabase.from("voice_transcripts").insert({
+    // Keep history for review/debugging (+ the audio clip while we tune prompts)
+    const { data: hist, error: histErr } = await supabase.from("voice_transcripts").insert({
       user_id: userId,
       group_id: groupId,
       duration_seconds: transcript.durationSec,
       transcript: transcript.text,
       proposal,
-      stt_model: STT_MODEL,
+      stt_model: transcriptOverride ? "override" : STT_MODEL,
       llm_model: LLM_MODEL,
-    });
+    }).select("id").single();
     if (histErr) console.error("voice_transcripts insert:", histErr.message);
+    if (hist && !transcriptOverride && file instanceof File) {
+      const audioPath = await storeAudio(userId, hist.id, file);
+      if (audioPath) {
+        await supabase.from("voice_transcripts").update({ audio_path: audioPath }).eq("id", hist.id);
+      }
+    }
 
     return reply({
       transcript: transcript.text,

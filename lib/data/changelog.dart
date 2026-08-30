@@ -15,6 +15,19 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.33.0',
+    date: '2026-08-30',
+    features: [
+      'Sesle görev: "ana başlık / alt görev / ikinci alt görev / yarına iş" gibi sözlü yapı işaretleri artık hiyerarşi ve tarih olarak uygulanıyor',
+      'Ses tanıma listedeki kişilerin adlarını biliyor (Neslihan artık Meslehan olmuyor); daha isabetli whisper-large-v3 modeli',
+      'Ses kayıtları geçici olarak arşivleniyor — prompt iyileştirmeleri gerçek kayıtlarla test edilecek',
+    ],
+    fixes: [
+      'Ses dialogu telefon ekranına sığıyor: daha küçük mikrofon, sarılan butonlar, kısa metin',
+      'Görev açıklaması artık başlığın tekrarı olmuyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.32.3',
     date: '2026-08-30',
     fixes: [

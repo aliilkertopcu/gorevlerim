@@ -384,16 +384,15 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Yapacaklarını konuşarak anlat; yapay zeka bunları görev ve alt görevlere ayırıp sana önizleme gösterir. '
-          'Kaydetmeden önce düzenleyebilirsin.',
+          'Konuş, yapay zeka görev ve alt görevlere ayırsın; kaydetmeden önce düzenlersin.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
-          'Örnek: "Yarın market alışverişi yap, altına süt ve ekmek. Cuma diş hekimine randevu al."',
+          '"Ana başlık taahhüt işleri, alt görev interneti bağlat. Yarına iş: faturayı yatır."',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         Center(
           child: _MicButton(
             color: color,
@@ -409,7 +408,7 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         _quotaLine(context),
         const SizedBox(height: 8),
         _Expander(
@@ -498,7 +497,7 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
                 ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         Center(
           child: _MicButton(
             color: Colors.red,
@@ -512,11 +511,12 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
           child: Text('Bitirmek için dokun', style: Theme.of(context).textTheme.bodySmall),
         ),
         const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             TextButton(onPressed: _cancelRecording, child: const Text('İptal')),
-            const SizedBox(width: 8),
             ElevatedButton.icon(
               onPressed: _stopRecording,
               icon: const Icon(Icons.stop, size: 18),
@@ -577,11 +577,12 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
         const SizedBox(height: 12),
         Text(_errorText ?? 'Bir hata oluştu', textAlign: TextAlign.center),
         const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Kapat')),
-            const SizedBox(width: 8),
             ElevatedButton(
               onPressed: () {
                 setState(() => _phase = _Phase.loading);
@@ -654,8 +655,10 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
         const SizedBox(height: 8),
         _quotaLine(context),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             TextButton(
               onPressed: () => setState(() {
@@ -664,12 +667,10 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
               }),
               child: const Text('Yeniden kaydet'),
             ),
-            const SizedBox(width: 8),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('İptal'),
             ),
-            const SizedBox(width: 8),
             ElevatedButton.icon(
               onPressed: selectedCount == 0 ? null : _saveTasks,
               icon: const Icon(Icons.check, size: 18),
@@ -704,23 +705,23 @@ class _MicButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: 120,
-        height: 120,
+        width: 96,
+        height: 96,
         child: Stack(
           alignment: Alignment.center,
           children: [
             AnimatedContainer(
               duration: Anim.fast,
-              width: 76 * haloScale,
-              height: 76 * haloScale,
+              width: 64 * haloScale,
+              height: 64 * haloScale,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: color.withValues(alpha: recording ? 0.25 : 0.12),
               ),
             ),
             Container(
-              width: 72,
-              height: 72,
+              width: 60,
+              height: 60,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: color,
@@ -728,7 +729,7 @@ class _MicButton extends StatelessWidget {
                   BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4)),
                 ],
               ),
-              child: Icon(recording ? Icons.stop : Icons.mic, color: Colors.white, size: 34),
+              child: Icon(recording ? Icons.stop : Icons.mic, color: Colors.white, size: 28),
             ),
           ],
         ),
@@ -845,7 +846,7 @@ class _ProposalTileState extends State<_ProposalTile> {
                       children: [
                         Icon(Icons.event, size: 14, color: widget.color),
                         const SizedBox(width: 4),
-                        Text(_dateFmt.format(p.date), style: theme.textTheme.bodySmall),
+                        Text(_dateFmt.format(p.date), style: theme.textTheme.bodySmall, softWrap: false),
                       ],
                     ),
                   ),
