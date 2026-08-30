@@ -15,6 +15,17 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.35.0',
+    date: '2026-08-30',
+    features: [
+      'Canlı transkript: konuşurken metin 30 saniyelik parçalar halinde ekranda belirir; kaydı bitirince sadece görev çıkarma adımı kalır (~2 s)',
+    ],
+    fixes: [
+      'Uzun kayıtlarda yükleme hatası (sunucu gövde limiti 1 MB → 30 MB)',
+      'Whisper sessizlik halüsinasyonları ("Altyazı M.K.", "abone ol") metinden ayıklanıyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.34.0',
     date: '2026-08-30',
     features: [

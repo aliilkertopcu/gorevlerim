@@ -133,6 +133,13 @@ class VoiceHistoryItem {
   }
 }
 
+class VoicePartial {
+  final String text;
+  final int usedSeconds;
+  final int limitSeconds;
+  const VoicePartial({required this.text, required this.usedSeconds, required this.limitSeconds});
+}
+
 class VoiceQuota {
   final int usedSeconds;
   final int limitSeconds;
@@ -186,6 +193,8 @@ class VoiceService {
     String? groupId,
     String? groupName,
     String? contextTasksJson,
+    String? transcriptOverride,
+    String? sttMode,
   }) async {
     final token = _token;
     if (token == null) throw Exception('Oturum bulunamadı');
@@ -197,6 +206,8 @@ class VoiceService {
       ..fields['group_id'] = groupId ?? ''
       ..fields['group_name'] = groupName ?? ''
       ..fields['context_tasks'] = contextTasksJson ?? ''
+      ..fields['transcript'] = transcriptOverride ?? ''
+      ..fields['stt_mode'] = sttMode ?? ''
       ..files.add(http.MultipartFile.fromBytes(
         'file',
         audioBytes,
@@ -233,6 +244,46 @@ class VoiceService {
       usedSeconds: json['used_seconds'] as int? ?? 0,
       limitSeconds: json['limit_seconds'] as int? ?? 600,
       message: json['message'] as String?,
+    );
+  }
+
+  /// Transcribe one streamed segment (no LLM). Counts against the daily quota.
+  Future<VoicePartial> transcribePartial({
+    required Uint8List wavBytes,
+    required int durationSeconds,
+    String prevText = '',
+    String? groupId,
+  }) async {
+    final token = _token;
+    if (token == null) throw Exception('Oturum bulunamadı');
+    final req = http.MultipartRequest('POST', _endpoint.replace(queryParameters: {'partial': '1'}))
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['duration_seconds'] = durationSeconds.toString()
+      ..fields['prev_text'] = prevText
+      ..fields['group_id'] = groupId ?? ''
+      ..files.add(http.MultipartFile.fromBytes(
+        'file',
+        wavBytes,
+        filename: 'segment.wav',
+        contentType: MediaType('audio', 'wav'),
+      ));
+    final streamed = await req.send().timeout(const Duration(seconds: 60));
+    final res = await http.Response.fromStream(streamed);
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    if (res.statusCode == 429) {
+      throw VoiceQuotaExceeded(
+        json['message'] as String? ?? 'Günlük ses limiti doldu',
+        json['used_seconds'] as int? ?? 0,
+        json['limit_seconds'] as int? ?? 600,
+      );
+    }
+    if (res.statusCode != 200) {
+      throw Exception(json['error'] ?? 'Parça işlenemedi (${res.statusCode})');
+    }
+    return VoicePartial(
+      text: json['transcript'] as String? ?? '',
+      usedSeconds: json['used_seconds'] as int? ?? 0,
+      limitSeconds: json['limit_seconds'] as int? ?? 600,
     );
   }
 

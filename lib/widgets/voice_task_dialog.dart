@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -94,6 +95,7 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
   void dispose() {
     _ticker?.cancel();
     _ampSub?.cancel();
+    _pcmSub?.cancel();
     _recorder.dispose();
     super.dispose();
   }
@@ -122,6 +124,26 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
   }
 
   // ---------- Recording ----------
+  // Preferred path: PCM stream → 30 s WAV segments transcribed live while the
+  // user keeps talking; stop = one short LLM call. Falls back to file recording
+  // where streaming is unsupported.
+  static const _segmentSeconds = 30;
+  static const _sampleRate = 16000;
+
+  bool _streaming = false;
+  StreamSubscription<Uint8List>? _pcmSub;
+  final BytesBuilder _allPcm = BytesBuilder(copy: false);
+  final BytesBuilder _segPcm = BytesBuilder(copy: false);
+  int _segStartElapsed = 0;
+  int _detectedRate = _sampleRate; // browsers may ignore the requested rate
+  DateTime? _streamStartedAt;
+  final List<String?> _liveParts = [];
+  final List<Future<void>> _pendingPartials = [];
+  String? _liveError;
+
+  String get _liveText => _liveParts.whereType<String>().join(' ').trim();
+  bool get _hasPendingPartial => _liveParts.contains(null);
+
   Future<void> _startRecording() async {
     try {
       if (!await _recorder.hasPermission()) {
@@ -132,44 +154,41 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
         return;
       }
 
-      // Pick the best encoder the platform supports (small files, wide support)
-      AudioEncoder encoder;
-      if (await _recorder.isEncoderSupported(AudioEncoder.opus)) {
-        encoder = AudioEncoder.opus;
-        _mimeType = kIsWeb ? 'audio/webm' : 'audio/ogg';
-        _fileExt = kIsWeb ? 'webm' : 'ogg';
-      } else if (await _recorder.isEncoderSupported(AudioEncoder.aacLc)) {
-        encoder = AudioEncoder.aacLc;
-        _mimeType = 'audio/mp4';
-        _fileExt = 'm4a';
-      } else {
-        encoder = AudioEncoder.wav;
-        _mimeType = 'audio/wav';
-        _fileExt = 'wav';
-      }
-
-      final config = RecordConfig(
-        encoder: encoder,
-        bitRate: 32000,
-        sampleRate: 16000,
-        numChannels: 1,
-        noiseSuppress: true,
-        echoCancel: true,
-      );
-
-      String path = '';
-      if (!kIsWeb) {
-        final dir = await getTemporaryDirectory();
-        path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.$_fileExt';
-      }
-
-      await _recorder.start(config, path: path);
-
       _elapsed = 0;
+      _segStartElapsed = 0;
+      _allPcm.clear();
+      _segPcm.clear();
+      _liveParts.clear();
+      _pendingPartials.clear();
+      _liveError = null;
+
+      var started = false;
+      try {
+        final stream = await _recorder.startStream(const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: _sampleRate,
+          numChannels: 1,
+          noiseSuppress: true,
+          echoCancel: true,
+          autoGain: true,
+        ));
+        _streamStartedAt = DateTime.now();
+        _pcmSub = stream.listen((chunk) {
+          _allPcm.add(chunk);
+          _segPcm.add(chunk);
+        });
+        _streaming = true;
+        started = true;
+      } catch (_) {
+        _streaming = false;
+      }
+      if (!started) await _startFileRecording();
+
       _ticker?.cancel();
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
         if (!mounted) return;
         setState(() => _elapsed++);
+        if (_streaming && _elapsed - _segStartElapsed >= _segmentSeconds) _flushSegment();
         if (_elapsed >= _maxRecordSeconds) _stopRecording();
       });
 
@@ -178,7 +197,6 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
           .onAmplitudeChanged(const Duration(milliseconds: 150))
           .listen((a) {
         if (!mounted) return;
-        // dBFS: -60 (silence) .. 0 (max)
         final norm = ((a.current + 60) / 60).clamp(0.0, 1.0);
         setState(() => _amplitude = norm);
       });
@@ -192,13 +210,106 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
     }
   }
 
+  /// Legacy path: encoded file on disk / blob, transcribed in one go on stop.
+  Future<void> _startFileRecording() async {
+    AudioEncoder encoder;
+    if (await _recorder.isEncoderSupported(AudioEncoder.opus)) {
+      encoder = AudioEncoder.opus;
+      _mimeType = kIsWeb ? 'audio/webm' : 'audio/ogg';
+      _fileExt = kIsWeb ? 'webm' : 'ogg';
+    } else if (await _recorder.isEncoderSupported(AudioEncoder.aacLc)) {
+      encoder = AudioEncoder.aacLc;
+      _mimeType = 'audio/mp4';
+      _fileExt = 'm4a';
+    } else {
+      encoder = AudioEncoder.wav;
+      _mimeType = 'audio/wav';
+      _fileExt = 'wav';
+    }
+    final config = RecordConfig(
+      encoder: encoder,
+      bitRate: 32000,
+      sampleRate: 16000,
+      numChannels: 1,
+      noiseSuppress: true,
+      echoCancel: true,
+    );
+    String path = '';
+    if (!kIsWeb) {
+      final dir = await getTemporaryDirectory();
+      path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.$_fileExt';
+    }
+    await _recorder.start(config, path: path);
+  }
+
+  /// Measure the real PCM rate from bytes received so far (snap to a standard rate).
+  void _updateDetectedRate() {
+    final started = _streamStartedAt;
+    if (started == null) return;
+    final secs = DateTime.now().difference(started).inMilliseconds / 1000.0;
+    if (secs < 3) return;
+    final raw = _allPcm.length / 2 / secs;
+    const rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000];
+    var best = rates.first;
+    for (final r in rates) {
+      if ((r - raw).abs() < (best - raw).abs()) best = r;
+    }
+    _detectedRate = best;
+  }
+
+  /// Send the current PCM segment for live transcription.
+  void _flushSegment() {
+    _updateDetectedRate();
+    final bytes = _segPcm.takeBytes();
+    _segStartElapsed = _elapsed;
+    if (bytes.length < _detectedRate) return; // < 0.5 s, skip
+    final slot = _liveParts.length;
+    _liveParts.add(null);
+    final prev = _liveText;
+    final duration = (bytes.length / (_detectedRate * 2)).ceil();
+    final f = ref
+        .read(voiceServiceProvider)
+        .transcribePartial(
+          wavBytes: _pcmToWav(bytes, _detectedRate),
+          durationSeconds: duration,
+          prevText: prev,
+          groupId: ref.read(currentGroupProvider)?.id,
+        )
+        .then((r) {
+      if (!mounted) return;
+      setState(() {
+        _liveParts[slot] = r.text;
+        _quota = VoiceQuota(usedSeconds: r.usedSeconds, limitSeconds: r.limitSeconds);
+      });
+    }).catchError((e) {
+      if (!mounted) return;
+      setState(() {
+        _liveParts[slot] = '';
+        if (e is VoiceQuotaExceeded) {
+          _quota = VoiceQuota(usedSeconds: e.usedSeconds, limitSeconds: e.limitSeconds);
+          _liveError = e.message;
+          if (_phase == _Phase.recording) _stopRecording();
+        } else {
+          _liveError = 'Bir parça çevrilemedi: $e';
+        }
+      });
+    });
+    _pendingPartials.add(f);
+    setState(() {});
+  }
+
   Future<void> _cancelRecording() async {
     _ticker?.cancel();
     _ampSub?.cancel();
     try {
       final path = await _recorder.stop();
-      if (path != null) await deleteRecordedFile(path);
+      await _pcmSub?.cancel();
+      _pcmSub = null;
+      if (!_streaming && path != null) await deleteRecordedFile(path);
     } catch (_) {}
+    _allPcm.clear();
+    _segPcm.clear();
+    _liveParts.clear();
     if (!mounted) return;
     setState(() {
       _phase = _Phase.idle;
@@ -215,27 +326,62 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
 
     try {
       final path = await _recorder.stop();
-      if (path == null) throw Exception('Kayıt alınamadı');
+      await _pcmSub?.cancel();
+      _pcmSub = null;
       final duration = _elapsed;
 
       if (duration < 1) {
-        await deleteRecordedFile(path);
+        if (!_streaming && path != null) await deleteRecordedFile(path);
         setState(() => _phase = _Phase.idle);
         return;
       }
 
-      final bytes = await readRecordedFile(path);
-      await deleteRecordedFile(path);
+      final Uint8List bytes;
+      final String mime;
+      final String fileName;
+      String? override;
+      if (_streaming) {
+        _flushSegment();
+        await Future.wait(_pendingPartials);
+        _updateDetectedRate();
+        bytes = _pcmToWav(_allPcm.takeBytes(), _detectedRate);
+        mime = 'audio/wav';
+        fileName = 'audio.wav';
+        override = _liveText;
+        if (override.isEmpty) {
+          if (!mounted) return;
+          setState(() {
+            _result = VoiceResult(
+              transcript: '',
+              tasks: const [],
+              ignored: const [],
+              usedSeconds: _quota?.usedSeconds ?? 0,
+              limitSeconds: _quota?.limitSeconds ?? 600,
+              message: 'Kayıtta konuşma algılanamadı.',
+            );
+            _phase = _Phase.preview;
+          });
+          return;
+        }
+      } else {
+        if (path == null) throw Exception('Kayıt alınamadı');
+        bytes = await readRecordedFile(path);
+        await deleteRecordedFile(path);
+        mime = _mimeType;
+        fileName = 'audio.$_fileExt';
+      }
 
       final result = await ref.read(voiceServiceProvider).transcribe(
             audioBytes: bytes,
-            mimeType: _mimeType,
-            fileName: 'audio.$_fileExt',
+            mimeType: mime,
+            fileName: fileName,
             durationSeconds: duration,
             viewDate: ref.read(selectedDateProvider),
             groupId: ref.read(currentGroupProvider)?.id,
             groupName: ref.read(currentGroupProvider)?.name,
             contextTasksJson: _contextTasksJson(),
+            transcriptOverride: override,
+            sttMode: _streaming ? 'stream' : null,
           );
 
       if (!mounted) return;
@@ -258,6 +404,34 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
         _phase = _Phase.error;
       });
     }
+  }
+
+  /// Wrap raw 16-bit mono PCM in a WAV container.
+  static Uint8List _pcmToWav(Uint8List pcm, int sampleRate) {
+    const channels = 1;
+    const bitsPerSample = 16;
+    final byteRate = sampleRate * channels * bitsPerSample ~/ 8;
+    final out = ByteData(44 + pcm.length);
+    void str(int o, String s) {
+      for (var i = 0; i < s.length; i++) {
+        out.setUint8(o + i, s.codeUnitAt(i));
+      }
+    }
+    str(0, 'RIFF');
+    out.setUint32(4, 36 + pcm.length, Endian.little);
+    str(8, 'WAVE');
+    str(12, 'fmt ');
+    out.setUint32(16, 16, Endian.little);
+    out.setUint16(20, 1, Endian.little);
+    out.setUint16(22, channels, Endian.little);
+    out.setUint32(24, sampleRate, Endian.little);
+    out.setUint32(28, byteRate, Endian.little);
+    out.setUint16(32, channels * bitsPerSample ~/ 8, Endian.little);
+    out.setUint16(34, bitsPerSample, Endian.little);
+    str(36, 'data');
+    out.setUint32(40, pcm.length, Endian.little);
+    out.buffer.asUint8List(44).setAll(0, pcm);
+    return out.buffer.asUint8List();
   }
 
   /// Current day's tasks as compact JSON so the model can act on existing items.
@@ -559,6 +733,34 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
                 ),
           ),
         ),
+        if (_streaming) ...[
+          const SizedBox(height: 10),
+          Container(
+            constraints: const BoxConstraints(minHeight: 44, maxHeight: 140),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: SingleChildScrollView(
+              reverse: true,
+              child: Text(
+                _liveText.isEmpty
+                    ? (_hasPendingPartial ? 'Çevriliyor…' : 'Konuştukça metin burada belirir (30 s aralıklarla).')
+                    : '$_liveText${_hasPendingPartial ? ' …' : ''}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _liveText.isEmpty ? Theme.of(context).hintColor : null,
+                    ),
+              ),
+            ),
+          ),
+          if (_liveError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(_liveError!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange)),
+            ),
+        ],
         const SizedBox(height: 12),
         Center(
           child: _MicButton(
@@ -591,7 +793,7 @@ class _VoiceTaskDialogState extends ConsumerState<VoiceTaskDialog> {
     );
   }
 
-  Widget _buildProcessing(BuildContext context, {String label = 'Ses metne çevriliyor ve görevler çıkarılıyor…'}) {
+  Widget _buildProcessing(BuildContext context, {String label = 'Görevler çıkarılıyor…'}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Column(

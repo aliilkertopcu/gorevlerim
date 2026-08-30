@@ -78,7 +78,7 @@ interface Transcript {
   durationSec: number;
 }
 
-async function transcribe(file: File, fallbackDuration: number, vocabulary: string[]): Promise<Transcript> {
+async function transcribe(file: File, fallbackDuration: number, vocabulary: string[], prevText = ""): Promise<Transcript> {
   const form = new FormData();
   form.append("file", file, file.name || "audio.webm");
   form.append("model", STT_MODEL);
@@ -88,7 +88,9 @@ async function transcribe(file: File, fallbackDuration: number, vocabulary: stri
   // Style/vocabulary hint: proper Turkish punctuation, task phrasing, and the
   // names/terms this user actually uses (group members, recent task words).
   const vocab = vocabulary.length ? `Kişiler ve terimler: ${vocabulary.join(", ")}. ` : "";
-  form.append("prompt", `${vocab}Bugünkü görevler: çamaşırları makineye at, bulaşık makinesini boşalt, mutfağı topla. Ana başlık: taahhüt işleri. Alt görev: internet aboneliği anlaşmasını yap. Yarına iş: faturayı yatır.`);
+  // For streamed segments, the tail of the previous segment keeps Whisper's context continuous.
+  const tail = prevText ? ` ${prevText.slice(-160)}` : "";
+  form.append("prompt", `${vocab}Bugünkü görevler: çamaşırları makineye at, bulaşık makinesini boşalt, mutfağı topla. Ana başlık: taahhüt işleri. Alt görev: internet aboneliği anlaşmasını yap. Yarına iş: faturayı yatır.${tail}`);
 
   const res = await fetchWithRetry("https://api.groq.com/openai/v1/audio/transcriptions", {
     method: "POST",
@@ -113,8 +115,18 @@ async function transcribe(file: File, fallbackDuration: number, vocabulary: stri
 
 // Whisper hallucinates on silence, typically as a short phrase repeated many times
 // ("abone ol abone ol abone ol...", "Altyazı M.K."). Collapse 3+ consecutive repeats.
+const HALLUCINATIONS = [
+  /altyaz[ıi]\s*m\.?\s*k\.?/gi,
+  /\baltyaz[ıi]\b:?\s*[a-zçğıöşü. ]{0,25}$/gi,
+  /\babone ol(un)?\b\.?/gi,
+  /izledi[ğg]iniz için teşekkür(ler| ederim)\.?/gi,
+  /kanal[ıi]ma abone ol[a-zçğıöşü]*\.?/gi,
+];
+
 function cleanTranscript(raw: string): string {
   let text = raw.replace(/\s+/g, " ").trim();
+  for (const re of HALLUCINATIONS) text = text.replace(re, " ");
+  text = text.replace(/\s+/g, " ").trim();
   // phrase of 1-6 words repeated 3+ times back to back → keep one copy
   text = text.replace(/\b((?:\S+\s+){0,5}\S+?)(?:[\s,.]+\1){2,}\b/giu, "$1");
   return text.trim();
@@ -455,8 +467,29 @@ Deno.serve(async (req) => {
   try {
     const form = await req.formData();
     const file = form.get("file");
-    // Testing/tuning path: a ready transcript skips STT and the audio quota
+
+    // Streaming mode: transcribe one ~30 s segment, count quota, return text only.
+    if (url.searchParams.get("partial") === "1") {
+      if (!(file instanceof File)) return reply({ error: "file alanı gerekli" }, 400);
+      if (file.size > MAX_BYTES) return reply({ error: "Parça 25 MB'den büyük" }, 413);
+      const segDuration = Math.ceil(Number(form.get("duration_seconds") ?? 0)) || 0;
+      const prevText = String(form.get("prev_text") ?? "").slice(0, 400);
+      const gidRaw = String(form.get("group_id") ?? "");
+      const gid = /^[0-9a-f-]{36}$/i.test(gidRaw) ? gidRaw : null;
+      const usedNow = await getUsedToday(userId);
+      if (usedNow >= limit) {
+        return reply({ error: "quota_exceeded", message: "Bugünkü ses kaydı limitin doldu.", used_seconds: usedNow, limit_seconds: limit }, 429);
+      }
+      const vocabulary = await vocabularyFor(userId, gid);
+      const seg = await transcribe(file, segDuration, vocabulary, prevText);
+      const usedAfterSeg = await recordUsage(userId, Math.max(seg.durationSec, 1));
+      return reply({ transcript: seg.text, duration_seconds: seg.durationSec, used_seconds: usedAfterSeg, limit_seconds: limit });
+    }
+
+    // Testing/tuning path (and streaming finalisation): a ready transcript skips STT.
+    // If a file is still attached (streaming), it is archived but not transcribed.
     const transcriptOverride = String(form.get("transcript") ?? "").trim();
+    const sttMode = String(form.get("stt_mode") ?? "");
     if (!transcriptOverride) {
       if (!(file instanceof File)) return reply({ error: "file alanı gerekli" }, 400);
       if (file.size > MAX_BYTES) return reply({ error: "Ses dosyası 25 MB'den büyük" }, 413);
@@ -511,7 +544,7 @@ Deno.serve(async (req) => {
     let transcript: Transcript;
     let usedAfter = usedBefore;
     if (transcriptOverride) {
-      transcript = { text: cleanTranscript(transcriptOverride), durationSec: 0 };
+      transcript = { text: cleanTranscript(transcriptOverride), durationSec: sttMode === "stream" ? clientDuration : 0 };
     } else {
       const vocabulary = await vocabularyFor(userId, groupId);
       transcript = await transcribe(file as File, clientDuration, vocabulary);
@@ -539,11 +572,11 @@ Deno.serve(async (req) => {
       duration_seconds: transcript.durationSec,
       transcript: transcript.text,
       proposal,
-      stt_model: transcriptOverride ? "override" : STT_MODEL,
+      stt_model: transcriptOverride ? (sttMode === "stream" ? `${STT_MODEL} (stream)` : "override") : STT_MODEL,
       llm_model: LLM_MODEL,
     }).select("id").single();
     if (histErr) console.error("voice_transcripts insert:", histErr.message);
-    if (hist && !transcriptOverride && file instanceof File) {
+    if (hist && file instanceof File) {
       const audioPath = await storeAudio(userId, hist.id, file);
       if (audioPath) {
         await supabase.from("voice_transcripts").update({ audio_path: audioPath }).eq("id", hist.id);
