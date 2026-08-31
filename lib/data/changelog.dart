@@ -20,7 +20,7 @@ const List<ChangelogEntry> changelog = [
     features: [
       'Görsel kimlik 2. faz: görev tamamlamada çek animasyonu, hafif titreşim ve günün son görevi bitince kutlama',
       'Silme artık onay sormuyor — anında siler, 5 saniye "Geri Al" imkânı verir',
-      'Checkbox'lar dokunma dostu (daha büyük basma alanı, dalga efekti)',
+      'Kutucuklar dokunma dostu (daha büyük basma alanı, dalga efekti)',
       'Görev başlığı tamamlanınca yumuşak geçişle üstü çiziliyor',
     ],
     fixes: [
