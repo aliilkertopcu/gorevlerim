@@ -56,6 +56,8 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 ## Sunucu
 - Linode 172.105.93.29, SSH key `~/.ssh/linode_admin`
 - nginx: `/tasks/` → `/var/www/gorevlerim/`, `/` → Ghost blog (8080), `api.aitopcu.com` → Supabase proxy (resolver ile lazy DNS)
+- ⚠️ nginx `/tasks/` bloğu `Cache-Control: no-cache` gönderir (2026-08-31'de eklendi, yedek `/root/aitopcu.com.bak.*`). Öncesinde hiç cache header'ı yoktu; tarayıcı sezgisel önbelleklemeyle eski build'i servis ediyor, yeni sürüm sadece Ctrl+F5 ile geliyordu. Flutter dosya adlarında içerik hash'i taşımadığı için (main.dart.js, flutter_bootstrap.js hep aynı isim) revalidation şart — ETag ile 304 dönüyor, maliyeti yok
+- Flutter'ın service worker'ı artık kendini kaldıran sürüm; `flutter_bootstrap.js` yalnızca zaten bir kayıt varsa register ediyor, dolayısıyla eski SW'ler ilk ziyarette temizleniyor (PWA olarak kurulu istemciler dahil)
 - Supabase free tier — inaktivitede pause olur; nginx'in bu durumda ayakta kalması için proxy_pass değişkenli
 
 ## Konvansiyonlar
