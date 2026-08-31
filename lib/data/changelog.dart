@@ -15,6 +15,13 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.37.2',
+    date: '2026-08-31',
+    fixes: [
+      'Konfeti artik cok hizli gecmiyor: parcacik hizi ve yercekimi dusuruldu, hafif saga sola savrularak yaklasik 4 saniye boyunca suzuluyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.37.1',
     date: '2026-08-31',
     fixes: [

@@ -34,7 +34,7 @@ void main() {
     expect(paints.any((p) => p.painter.runtimeType.toString() == '_ConfettiPainter'), isTrue);
 
     // After its lifetime the entry removes itself
-    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(seconds: 5));
     final after = tester.widgetList<CustomPaint>(find.byType(CustomPaint));
     expect(after.any((p) => p.painter.runtimeType.toString() == '_ConfettiPainter'), isFalse);
   });
@@ -49,8 +49,8 @@ void main() {
     expect(paints.any((p) => p.painter.runtimeType.toString() == '_ConfettiPainter'), isTrue,
         reason: 'celebration must still happen under reduced motion');
 
-    // Calm variant is shorter than the standard 2.4 s burst
-    await tester.pump(const Duration(milliseconds: 2000));
+    // Calm variant is shorter than the standard 4.2 s burst
+    await tester.pump(const Duration(milliseconds: 3600));
     final after = tester.widgetList<CustomPaint>(find.byType(CustomPaint));
     expect(after.any((p) => p.painter.runtimeType.toString() == '_ConfettiPainter'), isFalse);
   });

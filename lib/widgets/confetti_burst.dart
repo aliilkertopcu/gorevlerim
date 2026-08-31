@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../theme/animation_constants.dart';
 
-/// Fires a party-popper style confetti burst over the whole screen.
+/// Fires a party-popper style confetti burst over the whole screen:
+/// a quick launch, then a slow fluttering fall that lasts ~4 s.
 ///
-/// Reduced motion doesn't cancel the celebration (the user asked for it and it
-/// is over in ~2 s) — it becomes calmer instead: fewer pieces, barely any spin.
+/// Reduced motion doesn't cancel the celebration (the user asked for it) —
+/// it becomes calmer instead: fewer pieces, barely any spin, a bit shorter.
 void showConfetti(BuildContext context) {
   final overlay = Overlay.maybeOf(context, rootOverlay: true);
   if (overlay == null) return;
@@ -50,18 +51,23 @@ class _Particle {
   final double velocity; // px/s
   final double size; // longest edge, logical px
   final double spin; // turns over the flight
-  final double drift; // horizontal sway, px/s
+  final double delay; // staggered launch, seconds
+  final double swayPhase;
+  final double swayAmp; // px
   final int colorIndex;
   final bool rect; // ribbon vs dot
 
   _Particle(math.Random r, int colorCount, {bool calm = false})
-      : originX = 0.30 + r.nextDouble() * 0.40,
-        // Upward cone, ±50°
-        angle = -math.pi / 2 + (r.nextDouble() - 0.5) * 0.56 * math.pi,
-        velocity = 950 + r.nextDouble() * 350,
+      : originX = 0.28 + r.nextDouble() * 0.44,
+        // Upward cone, ±40°
+        angle = -math.pi / 2 + (r.nextDouble() - 0.5) * 0.44 * math.pi,
+        // Gentle launch: the fall, not the launch, is the show
+        velocity = 320 + r.nextDouble() * 260,
         size = 9 + r.nextDouble() * 11,
-        spin = (r.nextDouble() - 0.5) * (calm ? 2 : 8),
-        drift = (r.nextDouble() - 0.5) * 90,
+        spin = (r.nextDouble() - 0.5) * (calm ? 1.5 : 4),
+        delay = r.nextDouble() * 0.35,
+        swayPhase = r.nextDouble() * math.pi * 2,
+        swayAmp = calm ? 0 : 6 + r.nextDouble() * 14,
         colorIndex = r.nextInt(colorCount),
         rect = r.nextInt(3) != 0; // mostly ribbons
 }
@@ -81,7 +87,7 @@ class _ConfettiBurstState extends State<_ConfettiBurst>
       count,
       (_) => _Particle(rand, widget.colors.length, calm: widget.calm),
     );
-    _lifetime = Duration(milliseconds: widget.calm ? 2000 : 2600);
+    _lifetime = Duration(milliseconds: widget.calm ? 3400 : 4200);
     _controller = AnimationController(vsync: this, duration: _lifetime)
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed) widget.onDone();
@@ -125,26 +131,32 @@ class _ConfettiPainter extends CustomPainter {
     required this.seconds,
   });
 
+  /// Low gravity + horizontal drag: the pieces hang and flutter instead of
+  /// shooting past the screen in a fraction of a second.
+  static const _gravity = 260.0; // px/s²
+  static const _drag = 2.2; // horizontal damping
+
   @override
   void paint(Canvas canvas, Size size) {
-    const gravity = 1000.0; // px/s² — gentle, so the burst hangs ~2.3 s
-    final fade = t < 0.75 ? 1.0 : (1.0 - (t - 0.75) / 0.25);
+    final fade = t < 0.8 ? 1.0 : (1.0 - (t - 0.8) / 0.2);
     final paint = Paint();
-    final launchY = size.height * 0.85;
+    final launchY = size.height * 0.82;
 
     for (final p in particles) {
-      final x = p.originX * size.width +
-          math.cos(p.angle) * p.velocity * seconds +
-          p.drift * seconds;
-      final y = launchY +
-          math.sin(p.angle) * p.velocity * seconds +
-          0.5 * gravity * seconds * seconds;
+      final s = seconds - p.delay;
+      if (s <= 0) continue; // not launched yet
+
+      // Horizontal: initial impulse bled off by drag, plus a fluttering sway
+      final dx = math.cos(p.angle) * p.velocity * (1 - math.exp(-_drag * s)) / _drag;
+      final x = p.originX * size.width + dx + math.sin(s * 2.2 + p.swayPhase) * p.swayAmp;
+      // Vertical: ballistic with gentle gravity
+      final y = launchY + math.sin(p.angle) * p.velocity * s + 0.5 * _gravity * s * s;
       if (y > size.height + 30 || x < -30 || x > size.width + 30) continue;
 
       paint.color = colors[p.colorIndex].withValues(alpha: fade);
       canvas.save();
       canvas.translate(x, y);
-      canvas.rotate(p.spin * t * math.pi * 2);
+      canvas.rotate(p.spin * s * math.pi);
       if (p.rect) {
         canvas.drawRRect(
           RRect.fromRectAndRadius(
