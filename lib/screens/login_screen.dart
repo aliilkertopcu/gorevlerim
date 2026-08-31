@@ -199,7 +199,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       Container(
                         decoration: BoxDecoration(
                           color: isDark
-                              ? AppTheme.darkSurface.withValues(alpha: 0.95)
+                              ? Theme.of(context).colorScheme.surfaceContainerHigh.withValues(alpha: 0.95)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [

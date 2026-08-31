@@ -61,7 +61,7 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 ## Konvansiyonlar
 - UI metinleri ve changelog Türkçe, commit mesajları İngilizce
 - Yeni ekran/dialog eklerken `DesktopDialog` sistemini kullan, Material `showDialog` değil
-- Renk için `AppTheme` + `currentOwnerColorProvider`; sabit renk kullanma
+- Tasarım token'ları: renkler `Theme.of(context).colorScheme` rollerinden (tema, grup renginden `ColorScheme.fromSeed` ile türetilir — `main.dart`); köşeler `Corners.small/medium/large` (butonlar Stadium); boşluklar `Gap` (4/8 ritmi); yazılar `textTheme` (Plus Jakarta Sans); hareket `Anim` (giriş 400/`enterCurve`, çıkış 200/`exitCurve`, `Anim.enabled(context)` reduced-motion). Ham hex/`Colors.grey` YAZMA. Durum renkleri `AppTheme.statusColor/statusBackground(context,...)`. Kurallar: `ui-ux-pro-max` ve `material-3` skill'leri
 - Animasyon süreleri `lib/theme/animation_constants.dart` (`Anim`) içinden
 - Testler: `flutter test` (animation, task_drag bölge hesabı, tasksProvider refresh/optimistic). Ses prompt regresyonu: `VOICE_EVAL_JWT=<token> python scripts/voice_eval/run.py` — `cases.json` gerçek kayıtlardan kurulur, prompt değişikliğinden sonra 40/40 beklenir.
 

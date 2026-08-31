@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
+import 'providers/group_provider.dart';
 
 // Web-only import for URL manipulation
 import 'web_utils.dart' if (dart.library.io) 'web_utils_stub.dart';
@@ -49,12 +50,14 @@ class TodoApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     final themeMode = ref.watch(themeModeProvider);
+    // The whole theme is seeded by the selected group's color (tonal identity).
+    final seedColor = ref.watch(currentOwnerColorProvider);
 
     return MaterialApp.router(
       title: 'Görevlerim',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme(seedColor),
+      darkTheme: AppTheme.darkTheme(seedColor),
       themeMode: themeMode,
       routerConfig: router,
       scrollBehavior: kIsWeb ? WebScrollBehavior() : null,

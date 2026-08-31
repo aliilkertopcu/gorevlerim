@@ -132,7 +132,7 @@ class _SubtaskItemState extends State<SubtaskItem> {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = AppTheme.statusColor(subtask.status);
+    final statusColor = AppTheme.statusColor(subtask.status, brightness: Theme.of(context).brightness);
     final blockedColor = AppTheme.blockedColor;
 
     final inner = AnimatedContainer(

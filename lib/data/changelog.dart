@@ -15,6 +15,16 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.36.0',
+    date: '2026-08-31',
+    features: [
+      'Yeni görsel kimlik (1. faz): tema artık seçili listenin renginden türetiliyor — tüm arayüz o rengin tonlarıyla uyumlu',
+      'Yeni yazı tipi: Plus Jakarta Sans, Material 3 tip skalası',
+      'Butonlar hap formunda, yüzeyler ton hiyerarşisiyle; koyu tema renkleri otomatik türetiliyor',
+      'Kişisel listelerin varsayılan rengi turkuaz oldu (kendi seçtiğin renkler korunur)',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.35.0',
     date: '2026-08-30',
     features: [

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
-import '../theme/app_theme.dart';
 import '../theme/animation_constants.dart';
 
 final _dateFormat = DateFormat('d MMMM yyyy, EEEE', 'tr_TR');
@@ -20,7 +19,7 @@ class DateNav extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCardBackground : Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
