@@ -63,6 +63,8 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 - Yeni ekran/dialog eklerken `DesktopDialog` sistemini kullan, Material `showDialog` değil
 - Tasarım token'ları: renkler `Theme.of(context).colorScheme` rollerinden (tema, grup renginden `ColorScheme.fromSeed` ile türetilir — `main.dart`); köşeler `Corners.small/medium/large` (butonlar Stadium); boşluklar `Gap` (4/8 ritmi); yazılar `textTheme` (Plus Jakarta Sans); hareket `Anim` (giriş 400/`enterCurve`, çıkış 200/`exitCurve`, `Anim.enabled(context)` reduced-motion). Ham hex/`Colors.grey` YAZMA. Durum renkleri `AppTheme.statusColor/statusBackground(context,...)`. Kurallar: `ui-ux-pro-max` ve `material-3` skill'leri
 - Animasyon süreleri `lib/theme/animation_constants.dart` (`Anim`) içinden
+- ⚠️ İşletim sisteminde "hareket azaltma" açıkken Flutter `AnimationController` sürelerini **20 kat** kısaltır (`AnimationBehavior.normal`). Kasıtlı, kullanıcının istediği animasyonlarda `animationBehavior: AnimationBehavior.preserve` kullan (örn. `confetti_burst.dart`)
+- Kutlama animasyonu: `assets/animations/confetti.json` (LottieFiles, Lottie Simple License — `assets/animations/CREDITS.md`)
 - Testler: `flutter test` (animation, task_drag bölge hesabı, tasksProvider refresh/optimistic). Ses prompt regresyonu: `VOICE_EVAL_JWT=<token> python scripts/voice_eval/run.py` — `cases.json` gerçek kayıtlardan kurulur, prompt değişikliğinden sonra 40/40 beklenir.
 
 ## Notlar

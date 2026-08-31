@@ -15,6 +15,16 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.38.0',
+    date: '2026-08-31',
+    features: [
+      'Kutlama animasyonu degisti: gunun tum gorevleri bitince ekrani gercek konfeti kaplıyor (LottieFiles animasyonu, Ta Son Quynh)',
+    ],
+    fixes: [
+      'Kutlamanin "flash gibi" gecmesinin sebebi bulundu: isletim sisteminde hareket azaltma acikken Flutter tum animasyonlari 20 kat hizlandiriyordu; kutlama artik bundan etkilenmiyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.37.2',
     date: '2026-08-31',
     fixes: [
