@@ -15,6 +15,14 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.37.1',
+    date: '2026-08-31',
+    fixes: [
+      'Konfeti artik gercekten gorunuyor: parca sayisi ve boyutu artirildi, ekranin altindan yukari fisekleniyor ve yaklasik 2,5 saniye havada kaliyor',
+      'Hareket azaltma acikken konfeti iptal edilmiyor, sadece daha sakin oynuyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.37.0',
     date: '2026-08-31',
     features: [

@@ -34,17 +34,24 @@ void main() {
     expect(paints.any((p) => p.painter.runtimeType.toString() == '_ConfettiPainter'), isTrue);
 
     // After its lifetime the entry removes itself
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 3));
     final after = tester.widgetList<CustomPaint>(find.byType(CustomPaint));
     expect(after.any((p) => p.painter.runtimeType.toString() == '_ConfettiPainter'), isFalse);
   });
 
-  testWidgets('confetti respects reduced motion', (tester) async {
+  testWidgets('reduced motion still celebrates, calmer and shorter', (tester) async {
     await tester.pumpWidget(_host(disableAnimations: true, onBuild: (c) => () => showConfetti(c)));
     await tester.tap(find.text('fire'));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
+
     final paints = tester.widgetList<CustomPaint>(find.byType(CustomPaint));
-    expect(paints.any((p) => p.painter.runtimeType.toString() == '_ConfettiPainter'), isFalse);
-    await tester.pump(const Duration(seconds: 2));
+    expect(paints.any((p) => p.painter.runtimeType.toString() == '_ConfettiPainter'), isTrue,
+        reason: 'celebration must still happen under reduced motion');
+
+    // Calm variant is shorter than the standard 2.4 s burst
+    await tester.pump(const Duration(milliseconds: 2000));
+    final after = tester.widgetList<CustomPaint>(find.byType(CustomPaint));
+    expect(after.any((p) => p.painter.runtimeType.toString() == '_ConfettiPainter'), isFalse);
   });
 }
