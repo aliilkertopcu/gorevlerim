@@ -4,12 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:web/web.dart' as web;
 
 /// Relative so it resolves against `<base href="/tasks/">` in production.
-const _chimeUrl = 'assets/assets/sounds/chime.mp3';
+const _cheerUrl = 'assets/assets/sounds/cheer.mp3';
 
 web.AudioContext? _context;
 web.AudioBuffer? _buffer;
 
-/// Plays the celebration chime through the Web Audio graph.
+/// Plays the celebration cheer through the Web Audio graph.
 ///
 /// A plain `<audio>` element was tried first and stalls at `readyState 0` in
 /// some Chrome contexts; decoding once into an [web.AudioBuffer] also means
@@ -17,7 +17,7 @@ web.AudioBuffer? _buffer;
 ///
 /// Never throws: browsers block audio that isn't tied to a user gesture, and a
 /// silent celebration beats a crash.
-Future<void> playChime() async {
+Future<void> playCheer() async {
   try {
     final context = _context ??= web.AudioContext();
     // A context created before the first gesture starts out suspended.
@@ -35,12 +35,12 @@ Future<void> playChime() async {
     source.connect(gain);
     source.start();
   } catch (e) {
-    debugPrint('Celebration chime failed: $e');
+    debugPrint('Celebration cheer failed: $e');
   }
 }
 
 Future<web.AudioBuffer> _decode(web.AudioContext context) async {
-  final response = await web.window.fetch(_chimeUrl.toJS).toDart;
+  final response = await web.window.fetch(_cheerUrl.toJS).toDart;
   final bytes = await response.arrayBuffer().toDart;
   return await context.decodeAudioData(bytes).toDart;
 }

@@ -65,8 +65,8 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 - Animasyon süreleri `lib/theme/animation_constants.dart` (`Anim`) içinden
 - ⚠️ İşletim sisteminde "hareket azaltma" açıkken Flutter `AnimationController` sürelerini **20 kat** kısaltır (`AnimationBehavior.normal`). Kasıtlı, kullanıcının istediği animasyonlarda `animationBehavior: AnimationBehavior.preserve` kullan (örn. `confetti_burst.dart`)
 - Kutlama animasyonu: `assets/animations/confetti.json` (LottieFiles, Lottie Simple License — `assets/animations/CREDITS.md`)
-- Kutlama sesi: `assets/sounds/chime.mp3` — `tools/make_chime.py` ile sentezlendi (harici lisans yok), yeniden üretmek için `python tools/make_chime.py` + `ffmpeg -i chime.wav -q:a 5 chime.mp3`. Çalma noktası `celebrate(context)` (`confetti_burst.dart`), platforma göre `lib/utils/chime.dart`
-- ⚠️ Web'de ses için `audioplayers` KULLANMA: ilk `create()` çağrısı 30 sn timeout ile takılıyor. Ayrıca `<audio>` elementi de bazı Chrome bağlamlarında `readyState 0`'da kalıyor. Web tarafı Web Audio API ile çalışıyor (`chime_web.dart`: fetch → `decodeAudioData` → `BufferSource`); `audioplayers` sadece mobil/masaüstünde (`chime_io.dart`)
+- Kutlama sesi: `assets/sounds/cheer.mp3` (4,4 sn tezahürat; kullanıcının verdiği dosyadan kırpıldı — `assets/sounds/CREDITS.md`). Çalma noktası `celebrate(context)` (`confetti_burst.dart`), platforma göre `lib/utils/cheer.dart`
+- ⚠️ Web'de ses için `audioplayers` KULLANMA: ilk `create()` çağrısı 30 sn timeout ile takılıyor. Ayrıca `<audio>` elementi de bazı Chrome bağlamlarında `readyState 0`'da kalıyor. Web tarafı Web Audio API ile çalışıyor (`cheer_web.dart`: fetch → `decodeAudioData` → `BufferSource`); `audioplayers` sadece mobil/masaüstünde (`cheer_io.dart`)
 - Testler: `flutter test` (animation, task_drag bölge hesabı, tasksProvider refresh/optimistic). Ses prompt regresyonu: `VOICE_EVAL_JWT=<token> python scripts/voice_eval/run.py` — `cases.json` gerçek kayıtlardan kurulur, prompt değişikliğinden sonra 40/40 beklenir.
 
 ## Notlar
