@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
+import '../utils/chime.dart';
+
 /// Key of the full-screen confetti overlay (used by tests).
 const confettiKey = ValueKey('confetti-overlay');
 
@@ -12,13 +14,19 @@ const _safetyTimeout = Duration(seconds: 12);
 /// Longest the celebration may run, even if the animation itself is longer.
 const _maxDuration = Duration(seconds: 8);
 
-/// Plays a full-screen confetti celebration once, then removes itself.
+/// Full-screen confetti + chime, played once. Removes itself when done.
 ///
 /// Animation: "Free Confetti Animation" by Tạ Sơn Quỳnh (LottieFiles, Lottie
 /// Simple License) — see `assets/animations/CREDITS.md`.
 ///
 /// This is a deliberate, user-requested celebration, so it plays even when the
 /// OS asks for reduced motion.
+void celebrate(BuildContext context) {
+  playChime();
+  showConfetti(context);
+}
+
+/// Confetti only (no sound).
 void showConfetti(BuildContext context) {
   final overlay = Overlay.maybeOf(context, rootOverlay: true);
   if (overlay == null) return;

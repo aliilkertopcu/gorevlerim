@@ -36,6 +36,20 @@ void main() {
     expect(find.byKey(confettiKey), findsNothing);
   });
 
+  testWidgets('celebrate() shows confetti even when audio is unavailable', (tester) async {
+    // No audio plugin in the test environment: the chime must fail silently.
+    await tester.pumpWidget(_host(onBuild: (c) => () => celebrate(c)));
+    await tester.tap(find.text('fire'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byKey(confettiKey), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 13));
+    await tester.pump();
+    expect(find.byKey(confettiKey), findsNothing);
+  });
+
   testWidgets('reduced motion still celebrates', (tester) async {
     await tester.pumpWidget(_host(disableAnimations: true, onBuild: (c) => () => showConfetti(c)));
     await tester.tap(find.text('fire'));

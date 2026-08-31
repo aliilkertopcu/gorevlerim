@@ -15,6 +15,13 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.39.0',
+    date: '2026-08-31',
+    features: [
+      'Kutlamaya ses eklendi: gunun tum gorevleri bitince konfetiyle birlikte yumusak bir can sesi caliyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.38.0',
     date: '2026-08-31',
     features: [

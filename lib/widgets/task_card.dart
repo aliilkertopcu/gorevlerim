@@ -533,7 +533,7 @@ class TaskCard extends ConsumerWidget {
     final tasks = ref.read(tasksProvider).value ?? const <Task>[];
     final allDone = tasks.isNotEmpty && tasks.every((t) => t.isCompleted || t.isPostponed);
     if (allDone) {
-      showConfetti(context);
+      celebrate(context);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(const SnackBar(
