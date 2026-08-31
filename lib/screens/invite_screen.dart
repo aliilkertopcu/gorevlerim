@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
+import '../widgets/app_feedback.dart';
 
 class InviteScreen extends ConsumerWidget {
   final String token;
@@ -128,7 +129,7 @@ class InviteScreen extends ConsumerWidget {
                   );
                 },
                 loading: () => const CircularProgressIndicator(),
-                error: (e, _) => _buildError('Hata: $e'),
+                error: (e, _) => _buildError(friendlyError(e)),
               ),
             ),
           ),

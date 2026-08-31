@@ -16,6 +16,7 @@ import '../providers/connection_provider.dart';
 import '../widgets/desktop_dialog.dart';
 import '../version.dart';
 import '../theme/animation_constants.dart';
+import '../widgets/app_feedback.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final String? initialGroupId;
@@ -427,7 +428,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   children: [
                                     const Icon(Icons.error_outline, size: 48, color: Colors.red),
                                     const SizedBox(height: 12),
-                                    Text('Hata: $error'),
+                                    Text(friendlyError(error)),
                                     const SizedBox(height: 12),
                                     ElevatedButton(
                                       onPressed: () => ref.invalidate(tasksStreamProvider),

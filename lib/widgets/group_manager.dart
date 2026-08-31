@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import '../providers/task_provider.dart';
 import '../theme/app_theme.dart';
+import 'app_feedback.dart';
 
 part 'group_detail_members.dart';
 part 'group_detail_settings.dart';
@@ -158,7 +159,7 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
                       );
                     },
                     loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(child: Text('Hata: $e')),
+                    error: (e, _) => Center(child: Text(friendlyError(e))),
                   ),
                   // Create / Join
                   SingleChildScrollView(
@@ -248,9 +249,7 @@ class _GroupManagerDialogState extends ConsumerState<GroupManagerDialog>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnack(context, e);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/history_service.dart';
 import '../theme/app_theme.dart';
 import 'desktop_dialog.dart';
+import 'app_feedback.dart';
 
 /// Action type metadata: Turkish label, icon, and color.
 class _ActionMeta {
@@ -133,7 +134,7 @@ class _HistoryContentState extends State<_HistoryContent> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Hata: ${snapshot.error}'));
+            return Center(child: Text(friendlyError(snapshot.error!)));
           }
           final entries = snapshot.data ?? [];
           if (entries.isEmpty) {

@@ -221,9 +221,7 @@ extension _GroupDetailActions on _GroupDetailViewState {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnack(context, e);
       }
     }
   }
@@ -241,9 +239,7 @@ extension _GroupDetailActions on _GroupDetailViewState {
       _loadInvites();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnack(context, e);
       }
     }
   }
@@ -287,9 +283,7 @@ extension _GroupDetailActions on _GroupDetailViewState {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnack(context, e);
       }
     } finally {
       if (mounted) _refresh(() => _isLoading = false);
@@ -341,9 +335,7 @@ extension _GroupDetailActions on _GroupDetailViewState {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnack(context, e);
       }
     } finally {
       if (mounted) _refresh(() => _isLoading = false);
@@ -401,9 +393,7 @@ extension _GroupDetailActions on _GroupDetailViewState {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnack(context, e);
       }
     } finally {
       if (mounted) _refresh(() => _isLoading = false);

@@ -7,6 +7,7 @@ import '../models/chat_message.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../theme/animation_constants.dart';
+import 'app_feedback.dart';
 
 /// Inline chat panel shown inside a task or subtask card.
 /// [taskId] or [subtaskId] must be provided (not both).
@@ -232,7 +233,7 @@ class _TaskChatWidgetState extends ConsumerState<TaskChatWidget> {
             ),
             error: (e, _) => Padding(
               padding: const EdgeInsets.all(8),
-              child: Text('Hata: $e', style: TextStyle(fontSize: 11, color: Colors.red[400])),
+              child: Text(friendlyError(e), style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.error)),
             ),
           ),
           // Realtime typing indicator — shows other users typing

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/task_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
+import 'app_feedback.dart';
 import 'desktop_dialog.dart';
 import 'voice_task_dialog.dart';
 
@@ -118,9 +119,7 @@ class TaskForm extends ConsumerWidget {
         }
       } catch (e) {
         if (dialogContext.mounted) {
-          ScaffoldMessenger.of(dialogContext).showSnackBar(
-            SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-          );
+          showErrorSnack(dialogContext, e);
           setDialogState(() => isLoading = false);
         }
       }
