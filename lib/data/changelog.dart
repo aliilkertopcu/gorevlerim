@@ -15,6 +15,19 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.36.1',
+    date: '2026-08-31',
+    features: [
+      'Görsel kimlik 2. faz: görev tamamlamada çek animasyonu, hafif titreşim ve günün son görevi bitince kutlama',
+      'Silme artık onay sormuyor — anında siler, 5 saniye "Geri Al" imkânı verir',
+      'Checkbox'lar dokunma dostu (daha büyük basma alanı, dalga efekti)',
+      'Görev başlığı tamamlanınca yumuşak geçişle üstü çiziliyor',
+    ],
+    fixes: [
+      'Günün tek görevi silindiğinde ekranda hayalet kart kalması düzeltildi',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.36.0',
     date: '2026-08-31',
     features: [

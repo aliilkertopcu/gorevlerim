@@ -36,7 +36,11 @@ final ownerContextProvider = StateProvider<OwnerContext?>((ref) {
 
 /// Optimistic state for tasks - allows instant UI updates
 class TasksNotifier extends StateNotifier<List<Task>> {
-  TasksNotifier() : super([]);
+  /// Identity sentinel: state is this exact list until real data arrives, so
+  /// an intentionally EMPTY local list (e.g. last task optimistically deleted)
+  /// is distinguishable from "no local data yet".
+  static final List<Task> unset = List.unmodifiable(<Task>[]);
+  TasksNotifier() : super(unset);
 
   DateTime? _lastOptimisticUpdate;
   static const _debounceMs = 800; // Ignore stream updates for 800ms after optimistic change
@@ -387,7 +391,8 @@ final tasksProvider = Provider.autoDispose<AsyncValue<List<Task>>>((ref) {
   // When stream is in error state (not loading), keep showing local data so we
   // don't flash an error screen when the app resumes from background.
   final contextChanging = streamAsync.isLoading && !streamAsync.isRefreshing;
-  if (localTasks.isNotEmpty && !contextChanging) {
+  final hasLocalData = !identical(localTasks, TasksNotifier.unset);
+  if (hasLocalData && !contextChanging) {
     return AsyncValue.data(localTasks);
   }
 

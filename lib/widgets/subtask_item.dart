@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/task.dart';
 import '../theme/app_theme.dart';
@@ -151,9 +152,18 @@ class _SubtaskItemState extends State<SubtaskItem> {
       child: Row(
         children: [
           // Checkbox
-          GestureDetector(
-            onTap: editable ? onToggle : null,
-            child: AnimatedContainer(
+          InkResponse(
+            onTap: editable
+                ? () {
+                    HapticFeedback.selectionClick();
+                    onToggle();
+                  }
+                : null,
+            radius: 20,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              child: Center(
+                child: AnimatedContainer(
               duration: Anim.fast,
               curve: Anim.defaultCurve,
               width: 18,
@@ -165,7 +175,7 @@ class _SubtaskItemState extends State<SubtaskItem> {
                       ? AppTheme.completedColor
                       : subtask.isBlocked
                           ? blockedColor
-                          : Colors.grey,
+                          : Theme.of(context).colorScheme.outline,
                   width: 2,
                 ),
                 color: subtask.isCompleted
@@ -181,6 +191,8 @@ class _SubtaskItemState extends State<SubtaskItem> {
                     : subtask.isBlocked
                         ? Icon(Icons.block, size: 10, color: blockedColor, key: const ValueKey('block'))
                         : const SizedBox.shrink(key: ValueKey('empty')),
+              ),
+                ),
               ),
             ),
           ),

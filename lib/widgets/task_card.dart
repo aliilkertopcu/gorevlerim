@@ -66,14 +66,18 @@ class TaskCard extends ConsumerWidget {
             const SizedBox(width: 4),
           ],
           Flexible(
-            child: Text(
-              task.title,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-                color: task.isCompleted ? Colors.grey : null,
-              ),
+            child: AnimatedDefaultTextStyle(
+              duration: Anim.normal,
+              curve: Anim.defaultCurve,
+              style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                    fontWeight: FontWeight.w500,
+                    decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                    decorationColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: task.isCompleted
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+              child: Text(task.title),
             ),
           ),
           if (task.subtasks.isNotEmpty) ...[
@@ -133,26 +137,34 @@ class TaskCard extends ConsumerWidget {
               child: Row(
                 children: [
                   // Checkbox
-                  GestureDetector(
-                      onTap: editable ? () => _toggleComplete(ref) : null,
-                      child: AnimatedContainer(
-                        duration: Anim.fast,
-                        curve: Anim.defaultCurve,
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: task.isCompleted ? AppTheme.completedColor : Colors.grey,
-                            width: 2,
+                  InkResponse(
+                      onTap: editable ? () => _toggleComplete(context, ref) : null,
+                      radius: 24,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: Anim.fast,
+                            curve: Anim.defaultCurve,
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: task.isCompleted
+                                    ? AppTheme.completedColor
+                                    : Theme.of(context).colorScheme.outline,
+                                width: 2,
+                              ),
+                              color: task.isCompleted ? AppTheme.completedColor : Colors.transparent,
+                            ),
+                            child: AnimatedScale(
+                              duration: Anim.normal,
+                              curve: Curves.easeOutBack,
+                              scale: task.isCompleted ? 1.0 : 0.0,
+                              child: const Icon(Icons.check, size: 16, color: Colors.white),
+                            ),
                           ),
-                          color: task.isCompleted ? AppTheme.completedColor : Colors.transparent,
-                        ),
-                        child: AnimatedSwitcher(
-                          duration: Anim.fast,
-                          child: task.isCompleted
-                              ? const Icon(Icons.check, size: 16, color: Colors.white, key: ValueKey('check'))
-                              : const SizedBox.shrink(key: ValueKey('empty')),
                         ),
                       ),
                     ),
@@ -509,10 +521,24 @@ class TaskCard extends ConsumerWidget {
     return items;
   }
 
-  void _toggleComplete(WidgetRef ref) {
+  void _toggleComplete(BuildContext context, WidgetRef ref) {
+    final completing = !task.isCompleted;
     ref.read(tasksNotifierProvider.notifier).optimisticToggleComplete(task.id);
     ref.read(taskServiceProvider).toggleComplete(task.id, task.isCompleted);
     _logIfGroupTask(ref, task.isCompleted ? 'task_uncompleted' : 'task_completed', '"${task.title}"');
+    if (!completing) return;
+    HapticFeedback.lightImpact();
+    // Quiet celebration when this completes the whole day.
+    final tasks = ref.read(tasksProvider).value ?? const <Task>[];
+    final allDone = tasks.isNotEmpty && tasks.every((t) => t.isCompleted || t.isPostponed);
+    if (allDone) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text('🎉 Bugünün tüm görevleri tamamlandı!'),
+          duration: Duration(seconds: 3),
+        ));
+    }
   }
 
   void _onMenuAction(BuildContext context, WidgetRef ref, String action) {
@@ -526,7 +552,7 @@ class TaskCard extends ConsumerWidget {
       case 'move':
         _showMoveDialog(context, ref);
       case 'delete':
-        _deleteTask(ref);
+        _deleteTask(context, ref);
       case 'focus':
         showFocusMode(context, ref, task);
       case 'toggle_lock':
@@ -892,11 +918,53 @@ class TaskCard extends ConsumerWidget {
     return Color(int.parse(hex, radix: 16));
   }
 
-  void _deleteTask(WidgetRef ref) {
-    _logIfGroupTask(ref, 'task_deleted', '"${task.title}"');
-    ref.read(tasksNotifierProvider.notifier).optimisticDeleteTask(task.id);
-    // Filtered realtime streams don't deliver DELETE events — refetch after the server confirms.
-    ref.read(taskServiceProvider).deleteTask(task.id).then((_) => refreshTasks(ref));
+  /// Optimistically hides the task and gives a 5 s undo window before the
+  /// server delete actually runs.
+  void _deleteTask(BuildContext context, WidgetRef ref) {
+    // This card is removed from the tree immediately, so the timer/undo
+    // closures must NOT touch `ref` — capture everything up front.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final notifier = ref.read(tasksNotifierProvider.notifier);
+    final service = ref.read(taskServiceProvider);
+    final owner = ref.read(ownerContextProvider);
+    final user = ref.read(currentUserProvider);
+    final groupService = ref.read(groupServiceProvider);
+    final messenger = ScaffoldMessenger.of(context);
+
+    void refetch() {
+      notifier.clearOptimisticWindow();
+      container.invalidate(tasksStreamProvider);
+    }
+
+    notifier.optimisticDeleteTask(task.id);
+    var undone = false;
+    final timer = Timer(const Duration(seconds: 5), () {
+      if (undone) return;
+      if (owner != null && user != null && owner.ownerType == 'group') {
+        groupService.logActivity(
+          groupId: owner.ownerId,
+          userId: user.id,
+          action: 'task_deleted',
+          details: '"${task.title}"',
+        );
+      }
+      // Filtered realtime streams don't deliver DELETE events — refetch after the server confirms.
+      service.deleteTask(task.id).then((_) => refetch());
+    });
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('"${task.title}" silindi'),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Geri Al',
+          onPressed: () {
+            undone = true;
+            timer.cancel();
+            refetch(); // server still has it — restore from truth
+          },
+        ),
+      ));
   }
 
   void _unblockTask(WidgetRef ref) {

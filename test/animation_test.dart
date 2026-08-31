@@ -96,22 +96,22 @@ void main() {
       expect(animContainers, findsWidgets);
     });
 
-    testWidgets('pending task checkbox has AnimatedSwitcher', (tester) async {
+    testWidgets('pending task checkbox has AnimatedScale check', (tester) async {
       final task = _makeTask(status: 'pending');
       await tester.pumpWidget(_testApp(TaskCard(task: task, index: 0)));
       await tester.pumpAndSettle();
 
-      // AnimatedSwitcher wraps the check icon
-      expect(find.byType(AnimatedSwitcher), findsWidgets);
+      // The check icon scales in/out inside the checkbox
+      expect(find.byType(AnimatedScale), findsWidgets);
     });
 
-    testWidgets('completed task shows check icon inside AnimatedSwitcher', (tester) async {
+    testWidgets('completed task shows check icon inside AnimatedScale', (tester) async {
       final task = _makeTask(status: 'completed');
       await tester.pumpWidget(_testApp(TaskCard(task: task, index: 0)));
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.check), findsOneWidget);
-      expect(find.byType(AnimatedSwitcher), findsWidgets);
+      expect(find.byType(AnimatedScale), findsWidgets);
     });
   });
 
@@ -123,7 +123,8 @@ void main() {
       await tester.pumpWidget(_testApp(TaskCard(task: task, index: 0)));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AnimatedScale), findsOneWidget);
+      // Two: the pressable card shell + the checkbox check icon
+      expect(find.byType(AnimatedScale), findsNWidgets(2));
     });
 
     testWidgets('card scale is 1.0 at rest', (tester) async {
@@ -131,7 +132,7 @@ void main() {
       await tester.pumpWidget(_testApp(TaskCard(task: task, index: 0)));
       await tester.pumpAndSettle();
 
-      final animScale = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
+      final animScale = tester.widget<AnimatedScale>(find.byType(AnimatedScale).first);
       expect(animScale.scale, 1.0);
     });
 
@@ -141,14 +142,14 @@ void main() {
       await tester.pumpAndSettle();
 
       // Find the GestureDetector wrapping AnimatedScale (the _PressableCard)
-      final cardFinder = find.byType(AnimatedScale);
+      final cardFinder = find.byType(AnimatedScale).first;
       final center = tester.getCenter(cardFinder);
 
       // Simulate pointer down
       final gesture = await tester.startGesture(center);
       await tester.pump();
 
-      final animScale = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
+      final animScale = tester.widget<AnimatedScale>(find.byType(AnimatedScale).first);
       expect(animScale.scale, Anim.pressedScale);
 
       await gesture.up();
@@ -160,7 +161,7 @@ void main() {
       await tester.pumpWidget(_testApp(TaskCard(task: task, index: 0)));
       await tester.pumpAndSettle();
 
-      final cardFinder = find.byType(AnimatedScale);
+      final cardFinder = find.byType(AnimatedScale).first;
       final center = tester.getCenter(cardFinder);
 
       final gesture = await tester.startGesture(center);
@@ -168,7 +169,7 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
 
-      final animScale = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
+      final animScale = tester.widget<AnimatedScale>(find.byType(AnimatedScale).first);
       expect(animScale.scale, 1.0);
     });
   });
