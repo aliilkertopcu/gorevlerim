@@ -15,6 +15,16 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.37.0',
+    date: '2026-08-31',
+    features: [
+      'Günün tüm görevleri tamamlanınca konfeti patlıyor 🎉 (hareket azaltma açıksa gösterilmez)',
+    ],
+    fixes: [
+      '"Geri Al" bildirimi 5 saniye sonunda kesin olarak kayboluyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.36.2',
     date: '2026-08-31',
     fixes: [

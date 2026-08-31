@@ -15,6 +15,7 @@ import '../theme/animation_constants.dart';
 import 'desktop_dialog.dart';
 import 'subtask_item.dart';
 import 'task_chat.dart';
+import 'confetti_burst.dart';
 import 'task_drag.dart';
 import 'task_history.dart';
 
@@ -532,6 +533,7 @@ class TaskCard extends ConsumerWidget {
     final tasks = ref.read(tasksProvider).value ?? const <Task>[];
     final allDone = tasks.isNotEmpty && tasks.every((t) => t.isCompleted || t.isPostponed);
     if (allDone) {
+      showConfetti(context);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(const SnackBar(
@@ -939,6 +941,8 @@ class TaskCard extends ConsumerWidget {
     notifier.optimisticDeleteTask(task.id);
     var undone = false;
     final timer = Timer(const Duration(seconds: 5), () {
+      // Make sure the undo bar leaves the screen even if the platform kept it around.
+      messenger.hideCurrentSnackBar();
       if (undone) return;
       if (owner != null && user != null && owner.ownerType == 'group') {
         groupService.logActivity(
