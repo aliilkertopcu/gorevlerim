@@ -1,4 +1,4 @@
-import 'package:flutter/animation.dart';
+
 import 'package:flutter/widgets.dart';
 
 /// Motion tokens — MD3 asymmetric timing: entrances decelerate and take

@@ -73,7 +73,9 @@ void main() {
 
     test('curves are correct', () {
       expect(Anim.defaultCurve, Curves.easeOutCubic);
-      expect(Anim.enterCurve, Curves.easeOut);
+      expect(Anim.enterCurve, const Cubic(0.05, 0.7, 0.1, 1.0)); // MD3 emphasized decelerate
+      expect(Anim.exitCurve, const Cubic(0.3, 0.0, 0.8, 0.15)); // MD3 emphasized accelerate
+      expect(Anim.exit < Anim.enter, isTrue); // exits faster than entrances
     });
 
     test('pressedScale is 0.97', () {
