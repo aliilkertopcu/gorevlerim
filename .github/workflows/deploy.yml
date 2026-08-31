@@ -21,6 +21,14 @@ jobs:
       - name: Build web
         run: flutter build web --release --base-href "/tasks/"
 
+      - name: Stamp the deployed version
+        # The running app polls this file to notice a newer deploy.
+        run: |
+          version=$(sed -n "s/.*appVersion = '\([^']*\)'.*/\1/p" lib/version.dart)
+          built=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "{\"version\":\"$version\",\"built\":\"$built\"}" > build/web/app_version.json
+          cat build/web/app_version.json
+
       - name: Write SSH key
         env:
           SSH_PRIVATE_KEY: ${{ secrets.LINODE_SSH_KEY }}

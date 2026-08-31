@@ -12,6 +12,7 @@ import '../widgets/task_form.dart';
 import '../widgets/group_selector.dart';
 import '../widgets/group_manager.dart';
 import '../widgets/connection_banner.dart';
+import '../widgets/update_banner.dart';
 import '../providers/connection_provider.dart';
 import '../widgets/desktop_dialog.dart';
 import '../version.dart';
@@ -81,6 +82,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Column(
           children: [
             const ConnectionBanner(),
+            const UpdateBanner(),
             Expanded(
               child: GestureDetector(
           onHorizontalDragUpdate: (details) {

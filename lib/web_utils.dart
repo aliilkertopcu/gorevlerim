@@ -22,3 +22,8 @@ void cleanUrlAfterOAuth() {
 void openUrl(String url) {
   web.window.location.href = url;
 }
+
+/// Reloads the page so the browser picks up a newer deploy.
+void reloadApp() {
+  web.window.location.reload();
+}

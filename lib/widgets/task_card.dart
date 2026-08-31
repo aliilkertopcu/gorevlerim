@@ -18,6 +18,7 @@ import 'task_chat.dart';
 import 'confetti_burst.dart';
 import 'task_drag.dart';
 import 'task_history.dart';
+import 'undo_snack.dart';
 
 part 'task_card_typing.dart';
 part 'task_card_chrome.dart';
@@ -940,7 +941,7 @@ class TaskCard extends ConsumerWidget {
 
     notifier.optimisticDeleteTask(task.id);
     var undone = false;
-    final timer = Timer(const Duration(seconds: 5), () {
+    final timer = Timer(undoWindow, () {
       // Make sure the undo bar leaves the screen even if the platform kept it around.
       messenger.hideCurrentSnackBar();
       if (undone) return;
@@ -955,20 +956,15 @@ class TaskCard extends ConsumerWidget {
       // Filtered realtime streams don't deliver DELETE events — refetch after the server confirms.
       service.deleteTask(task.id).then((_) => refetch());
     });
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text('"${task.title}" silindi'),
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: 'Geri Al',
-          onPressed: () {
-            undone = true;
-            timer.cancel();
-            refetch(); // server still has it — restore from truth
-          },
-        ),
-      ));
+    showUndoSnack(
+      messenger,
+      message: '"${task.title}" silindi',
+      onUndo: () {
+        undone = true;
+        timer.cancel();
+        refetch(); // server still has it — restore from truth
+      },
+    );
   }
 
   void _unblockTask(WidgetRef ref) {

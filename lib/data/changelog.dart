@@ -15,6 +15,17 @@ class ChangelogEntry {
 const List<ChangelogEntry> changelog = [
   // En yeni üstte
   ChangelogEntry(
+    version: '0.41.0',
+    date: '2026-08-31',
+    features: [
+      'Yeni surum yayinlandiginda uygulama bunu fark ediyor ve ustte "Yeni surum hazir - Yenile" seridi cikiyor',
+      '"Geri Al" bildiriminde kalan sure artik kisalan bir cizgi olarak gorunuyor',
+    ],
+    fixes: [
+      'Tarayici eski surumu onbellekten servis etmiyor: sunucu artik her istekte dogrulama istiyor, yeni surum icin Ctrl+F5 gerekmiyor',
+    ],
+  ),
+  ChangelogEntry(
     version: '0.40.0',
     date: '2026-08-31',
     features: [

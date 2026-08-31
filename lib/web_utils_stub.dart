@@ -10,3 +10,7 @@ void cleanUrlAfterOAuth() {
 void openUrl(String url) {
   // No-op on mobile — use url_launcher instead
 }
+
+void reloadApp() {
+  // No-op on mobile — the store handles app updates
+}

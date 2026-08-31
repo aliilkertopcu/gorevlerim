@@ -22,12 +22,14 @@ npx supabase functions deploy todo-api --no-verify-jwt   # edge function deploy
 ## Mimari
 - `lib/main.dart` — Supabase init (URL: api.aitopcu.com), tema, WebScrollBehavior
 - `lib/router.dart` — GoRouter; `/onboarding`, `/invite` auth redirect dışında
-- `lib/providers/` — Riverpod: auth, task (optimistic update + realtime stream), group, chat, connection (15s health check), theme
+- `lib/providers/` — Riverpod: auth, task (optimistic update + realtime stream), group, chat, connection (15s health check), theme, update (15 dk'da bir `app_version.json` ile deploy edilen sürümü karşılaştırır)
 - `lib/services/` — Supabase erişim katmanı; `history_service.dart` salt okunur (loglama DB trigger'da)
 - `lib/widgets/task_card.dart` — görev kartı; `part` dosyaları: `task_card_subtasks.dart` (alt görev listesi + ekleme satırı), `task_card_chrome.dart` (basma/hover kabuğu, sürükleme önizlemesi), `task_card_typing.dart`
 - `lib/widgets/task_drag.dart` — sürükle-bırak altyapısı: `adaptiveDraggable` (masaüstü anında / dokunmatik 180 ms), `TaskDropTarget` (üst=öne, alt=arkaya, orta=alt görev yap), otomatik kaydırma. Görev listesi düz `Column`, ReorderableListView kullanılmıyor.
 - Supabase filtreli stream DELETE olaylarını iletmez → silme/indirme/yükseltme sonrası `ref.invalidate(tasksStreamProvider)`
 - `lib/widgets/group_manager.dart` — liste/grup yönetimi; `_GroupDetailViewState` metodları `part` + extension olarak bölündü: `group_detail_members/settings/activity/actions.dart` (extension içinde `setState` yerine `_refresh` kullan)
+- `lib/widgets/update_banner.dart` — yeni deploy algılanınca çıkan şerit; sürüm damgası `app_version.json` deploy workflow'unda `lib/version.dart`'tan üretilir (lokal build'de dosya yok, şerit çıkmaz)
+- `lib/widgets/undo_snack.dart` — `showUndoSnack` + kalan süreyi gösteren kısalan çizgi (`undoWindow` = 5 sn); geri alınabilir işlemlerde bunu kullan
 - `lib/widgets/desktop_dialog.dart` — kendi dialog sistemi: desktop'ta sürüklenebilir/boyutlanabilir, mobilde klavye uyumlu
 - `lib/widgets/focus_mode.dart` — Pomodoro (15/25/45/60 dk + overtime)
 - `currentOwnerColorProvider` seçili grubun rengini tüm UI'a yayar
